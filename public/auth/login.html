@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Sign in · TNT Maritime Intelligence</title>
+  <link rel="icon" type="image/png" href="/images/tnt-logo-round.png">
+  <link rel="apple-touch-icon" href="/images/tnt-logo-round.png">
+  <link rel="stylesheet" href="/auth/login.css">
+</head>
+<body>
+  <div class="login-shell">
+    <aside class="login-visual" aria-hidden="true">
+      <div class="visual-veil"></div>
+      <img
+        class="visual-logo"
+        src="/images/tnt-logo-round.png"
+        alt=""
+        width="220"
+        height="220"
+      >
+      <div class="visual-content">
+        <p class="brand-mark">TNT</p>
+        <p class="brand-tag">Global Maritime Commodity Intelligence</p>
+        <p class="brand-members">CPT Towage · Fairplay Towage · Ocean Group · Sulnorte</p>
+      </div>
+    </aside>
+
+    <main class="login-panel">
+      <div class="panel-inner">
+        <header class="panel-header">
+          <h1>Sign in</h1>
+          <p>Access corridor analytics, multi-port opportunities, and the report builder.</p>
+        </header>
+
+        <form id="login-form" class="login-form" novalidate autocomplete="on">
+          <div class="field">
+            <label for="username">Username</label>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              autocomplete="username"
+              required
+              maxlength="64"
+              spellcheck="false"
+              placeholder="Enter your username"
+            >
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="password-wrap">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                required
+                maxlength="128"
+                placeholder="Enter your password"
+              >
+              <button type="button" class="toggle-pw" id="toggle-pw" aria-label="Show password">Show</button>
+            </div>
+          </div>
+
+          <div id="login-error" class="form-error" role="alert" hidden></div>
+
+          <button type="submit" class="submit-btn" id="submit-btn">
+            <span class="btn-label">Continue</span>
+            <span class="btn-spinner" hidden aria-hidden="true"></span>
+          </button>
+        </form>
+
+        <p class="auth-switch">
+          New here?
+          <a href="/register">Create an account</a>
+        </p>
+
+        <footer class="panel-foot">
+          <p>Authorized personnel only. Sessions expire after 8 hours of activity.</p>
+        </footer>
+      </div>
+    </main>
+  </div>
+  <script src="/auth/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,571 @@
+/* UX enhancements layered on top of the original app styles.
+   index.html on disk is not modified — these rules are injected at serve time. */
+
+/* ── Brand logo ───────────────────────────────────────────────────── */
+.header-logo {
+  height: 56px;
+  width: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #0b1f3a;
+  box-shadow:
+    0 0 0 2px rgba(212, 144, 10, 0.85),
+    0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.header-brand:hover .header-logo {
+  transform: scale(1.04);
+  box-shadow:
+    0 0 0 2px #D4900A,
+    0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.header-title h1 {
+  letter-spacing: 0.02em;
+}
+
+.header-title p {
+  max-width: 34ch;
+}
+
+/* Session / user chrome */
+.tnt-user-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 1px solid rgba(148, 163, 184, 0.35);
+  flex-shrink: 0;
+}
+
+.tnt-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #0b1f3a;
+  box-shadow: 0 0 0 1.5px rgba(212, 144, 10, 0.7);
+  flex-shrink: 0;
+}
+
+.tnt-user-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  line-height: 1.2;
+}
+
+.tnt-user-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.tnt-user-role {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #D4900A;
+  text-transform: uppercase;
+}
+
+.tnt-logout {
+  padding: 5px 11px;
+  border-radius: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: transparent;
+  color: #E2E8F0;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.15s;
+  font-family: inherit;
+}
+
+.tnt-logout:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #D4900A;
+  color: #fff;
+}
+
+/* Welcome strip */
+.tnt-welcome {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: linear-gradient(90deg, #EEF6FF 0%, #FFF8EB 100%);
+  border-bottom: 1px solid #CBD5E1;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #334155;
+  animation: tntSlideIn 0.35s ease both;
+}
+
+.tnt-welcome img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.tnt-welcome strong {
+  color: #001a4d;
+}
+
+.tnt-welcome-text {
+  flex: 1;
+  line-height: 1.35;
+}
+
+.tnt-welcome-dismiss {
+  border: none;
+  background: transparent;
+  color: #64748B;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.tnt-welcome-dismiss:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+}
+
+@keyframes tntSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Search keyboard hint */
+.tnt-search-wrap {
+  position: relative;
+}
+
+.tnt-search-wrap #f-q {
+  padding-right: 34px;
+}
+
+.tnt-kbd {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 700;
+  color: #94A3B8;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  border-radius: 4px;
+  padding: 1px 5px;
+  pointer-events: none;
+  line-height: 1.4;
+  font-family: inherit;
+}
+
+.tnt-search-wrap:focus-within .tnt-kbd {
+  display: none;
+}
+
+/* Shortcut / help bar */
+.tnt-help-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 14px;
+  background: #fff;
+  border-top: 1px solid #E2E8F0;
+  font-size: 10px;
+  color: #64748B;
+  flex-shrink: 0;
+}
+
+.tnt-help-bar kbd {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid #CBD5E1;
+  border-radius: 3px;
+  background: #F8FAFC;
+  font-size: 9px;
+  font-family: inherit;
+  font-weight: 700;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.tnt-help-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tnt-help-hints span {
+  white-space: nowrap;
+}
+
+/* Toasts */
+.tnt-toast-host {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 12000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.tnt-toast {
+  pointer-events: auto;
+  min-width: 220px;
+  max-width: 360px;
+  padding: 11px 14px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #F8FAFC;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.28);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  animation: tntToastIn 0.25s ease both;
+}
+
+.tnt-toast.ok {
+  border-left: 3px solid #34D399;
+}
+
+.tnt-toast.info {
+  border-left: 3px solid #60A5FA;
+}
+
+.tnt-toast.warn {
+  border-left: 3px solid #FBBF24;
+}
+
+.tnt-toast-close {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: #94A3B8;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.tnt-toast-close:hover {
+  color: #fff;
+}
+
+@keyframes tntToastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Empty-state CTA */
+.tnt-empty-cta {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #CBD5E1;
+  background: #fff;
+  color: #001a4d;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tnt-empty-cta:hover {
+  border-color: #D4900A;
+  background: #FFF8EB;
+}
+
+/* Detail panel affordance */
+.dp-hdr::after {
+  content: 'Esc to close';
+  position: absolute;
+  right: 42px;
+  top: 16px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.dp-hdr {
+  position: relative;
+}
+
+/* Active filter badge on Reset */
+.sb-actions .btn-out {
+  position: relative;
+}
+
+.tnt-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #D4900A;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.tnt-filter-badge[hidden] {
+  display: none !important;
+}
+
+/* Softer sidebar section headers */
+.sec-hdr {
+  transition: background 0.15s;
+}
+
+.sec-body {
+  transition: none;
+}
+
+/* Change-password modal */
+.tnt-pw-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.tnt-pw-dialog {
+  width: min(100%, 380px);
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px 22px 20px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+  font-family: inherit;
+  color: #0f172a;
+}
+
+.tnt-pw-dialog h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #001a4d;
+}
+
+.tnt-pw-lead {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.tnt-pw-form {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tnt-pw-form label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-top: 6px;
+}
+
+.tnt-pw-form input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #dbe3ee;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.tnt-pw-form input:focus {
+  outline: none;
+  border-color: #c4840a;
+  box-shadow: 0 0 0 3px rgba(196, 132, 10, 0.18);
+}
+
+.tnt-pw-error {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff1f2;
+  color: #9f1239;
+  font-size: 0.82rem;
+  border: 1px solid #fecdd3;
+}
+
+.tnt-pw-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.tnt-pw-cancel,
+.tnt-pw-save {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tnt-pw-cancel {
+  border: 1px solid #dbe3ee;
+  background: #fff;
+  color: #475569;
+}
+
+.tnt-pw-cancel:hover {
+  background: #f1f5f9;
+}
+
+.tnt-pw-save {
+  border: none;
+  background: #001a4d;
+  color: #fff;
+}
+
+.tnt-pw-save:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.tnt-pw-save:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* Stronger focus rings for keyboard users */
+.nav-tab:focus-visible,
+.btn:focus-visible,
+.pb:focus-visible,
+.db:focus-visible,
+.sc:focus-visible,
+.sec-hdr:focus-visible,
+.tnt-logout:focus-visible,
+.tnt-empty-cta:focus-visible,
+.tnt-welcome-dismiss:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid #D4900A;
+  outline-offset: 2px;
+}
+
+/* Header breathing room on mid widths */
+@media (max-width: 1100px) {
+  .header-stats { gap: 10px; }
+  .hstat-num { font-size: 14px; }
+  .tnt-user-meta { display: none; }
+  .tnt-help-hints { display: none; }
+}
+
+@media (max-width: 720px) {
+  .header-stats { display: none; }
+  .sidebar { width: 210px; min-width: 180px; }
+  .sum-bar { grid-template-columns: repeat(3, 1fr); }
+  .header-logo { width: 44px; height: 44px; }
+  .tnt-welcome { display: none; }
+  .tnt-help-bar { display: none; }
+}
+
+/* Detail panel backdrop cue */
+.dp.open {
+  box-shadow:
+    -4px 0 20px rgba(0, 0, 0, 0.12),
+    -40vw 0 0 40vw rgba(15, 23, 42, 0.18);
+}
+
+/* Report empty hint */
+.tnt-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted, #64748B);
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.45;
+}
+
+/* Table row selection affordance */
+tbody tr:focus-within,
+tbody tr:active {
+  outline: none;
+}
+
+tbody tr:hover td:first-child {
+  box-shadow: inset 3px 0 0 #D4900A;
+}
+
+/* Smoother nav tab active state */
+.nav-tab {
+  position: relative;
+}
+
+.nav-tab.active {
+  background: rgba(212, 144, 10, 0.08);
+}
+
+/* Sidebar action button stack spacing */
+.sb-actions .btn + .btn {
+  margin-top: 0;
+}
+
+/* View fade-in */
+.view.active {
+  animation: tntViewIn 0.2s ease both;
+}
+
+@keyframes tntViewIn {
+  from { opacity: 0.72; }
+  to { opacity: 1; }
+}
+
+/* Print: hide session chrome */
+@media print {
+  .tnt-user-bar,
+  .tnt-pw-modal,
+  .tnt-welcome,
+  .tnt-help-bar,
+  .tnt-toast-host { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-logo,
+  .tnt-welcome,
+  .tnt-toast,
+  .view.active {
+    animation: none !important;
+    transition: none !important;
+  }
+}
