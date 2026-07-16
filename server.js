@@ -10,6 +10,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 
+const { ensureUsersFile } = require('./scripts/seed-users');
+
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT) || 3847;
 const USERS_PATH = path.join(ROOT, 'data', 'users.json');
@@ -27,14 +29,18 @@ const sessions = new Map();
 
 function loadUsers() {
   if (!fs.existsSync(USERS_PATH)) {
-    console.error('Missing data/users.json. Run: npm run seed');
-    process.exit(1);
+    throw new Error('User store is not initialized. Restart the server or run: npm run seed');
   }
   const raw = JSON.parse(fs.readFileSync(USERS_PATH, 'utf8'));
-  return raw.users || [];
+  if (!Array.isArray(raw.users)) {
+    throw new Error('User store is corrupt (missing users array).');
+  }
+  return raw.users;
 }
 
 function saveUsers(users) {
+  const dir = path.dirname(USERS_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(USERS_PATH, JSON.stringify({ users }, null, 2), 'utf8');
 }
 
@@ -165,6 +171,14 @@ app.use(
 app.use(express.json({ limit: '32kb' }));
 app.use(express.urlencoded({ extended: false, limit: '32kb' }));
 app.use(cookieParser());
+
+// Invalid JSON bodies must return JSON (not Express's HTML "Bad Request")
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ ok: false, error: 'Invalid request body.' });
+  }
+  return next(err);
+});
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -407,11 +421,23 @@ app.use((req, res) => {
   res.status(404).send('Not found');
 });
 
-app.listen(PORT, () => {
-  console.log('');
-  console.log('  TNT Maritime Intelligence');
-  console.log(`  → http://localhost:${PORT}`);
-  console.log('  Login or create an account at /login and /register');
-  console.log('  Seeded demo users (npm run seed): admin, analyst, viewer, ops');
-  console.log('');
+async function start() {
+  const store = await ensureUsersFile();
+  if (store.created) {
+    console.log(`  Initialized ${store.count} demo users → ${store.path}`);
+  }
+
+  app.listen(PORT, () => {
+    console.log('');
+    console.log('  TNT Maritime Intelligence');
+    console.log(`  → http://localhost:${PORT}`);
+    console.log('  Login or create an account at /login and /register');
+    console.log('  Demo users: admin, analyst, viewer, ops');
+    console.log('');
+  });
+}
+
+start().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });

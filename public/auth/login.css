@@ -332,6 +332,48 @@ body {
   }
 }
 
+.field input:focus-visible,
+.toggle-pw:focus-visible,
+.submit-btn:focus-visible,
+.auth-switch a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.login-panel {
+  position: relative;
+}
+
+.login-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--navy) 0%, var(--gold) 55%, var(--gold-soft) 100%);
+  opacity: 0.9;
+}
+
+.field input:user-invalid:not(:placeholder-shown) {
+  border-color: #fda4af;
+}
+
+@media (max-width: 480px) {
+  .login-panel {
+    padding: 24px 18px 32px;
+  }
+
+  .panel-header h1 {
+    font-size: 2rem;
+  }
+
+  .login-form {
+    margin-top: 24px;
+    gap: 14px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;

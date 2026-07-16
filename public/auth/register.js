@@ -80,11 +80,19 @@
         return;
       }
 
-      window.location.href = '/';
+      try {
+        localStorage.setItem('tnt-username', u.toLowerCase());
+      } catch (_) { /* ignore */ }
+
+      window.location.href = '/?welcome=1';
     } catch (err) {
       showError('Unable to reach the server. Check that the app is running.');
       setLoading(false);
     }
+  });
+
+  [displayName, username, password, confirmPassword].forEach(function (el) {
+    el.addEventListener('input', clearError);
   });
 
   displayName.focus();

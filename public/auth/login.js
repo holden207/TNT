@@ -7,6 +7,7 @@
   const btnLabel = submitBtn.querySelector('.btn-label');
   const spinner = submitBtn.querySelector('.btn-spinner');
   const togglePw = document.getElementById('toggle-pw');
+  const REMEMBER_KEY = 'tnt-username';
 
   function showError(msg) {
     errorEl.hidden = false;
@@ -24,12 +25,28 @@
     btnLabel.textContent = on ? 'Signing in…' : 'Continue';
   }
 
+  try {
+    const saved = localStorage.getItem(REMEMBER_KEY);
+    if (saved && !username.value) {
+      username.value = saved;
+      password.focus();
+    } else {
+      username.focus();
+    }
+  } catch (_) {
+    username.focus();
+  }
+
   togglePw.addEventListener('click', function () {
     const show = password.type === 'password';
     password.type = show ? 'text' : 'password';
     togglePw.textContent = show ? 'Hide' : 'Show';
     togglePw.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    password.focus();
   });
+
+  username.addEventListener('input', clearError);
+  password.addEventListener('input', clearError);
 
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -39,6 +56,8 @@
     const p = password.value;
     if (!u || !p) {
       showError('Enter both username and password.');
+      if (!u) username.focus();
+      else password.focus();
       return;
     }
 
@@ -62,12 +81,14 @@
         return;
       }
 
-      window.location.href = '/';
+      try {
+        localStorage.setItem(REMEMBER_KEY, u.toLowerCase());
+      } catch (_) { /* ignore */ }
+
+      window.location.href = '/?welcome=1';
     } catch (err) {
       showError('Unable to reach the server. Check that the app is running.');
       setLoading(false);
     }
   });
-
-  username.focus();
 })();

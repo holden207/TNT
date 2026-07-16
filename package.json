@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "seed": "node scripts/seed-users.js",
+    "seed:force": "node scripts/seed-users.js --force",
     "setup": "npm install && node scripts/seed-users.js"
   },
   "engines": {
