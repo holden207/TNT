@@ -53,7 +53,7 @@
     var title = document.querySelector('.header-title h1');
     if (title && !title.dataset.branded) {
       title.dataset.branded = '1';
-      title.textContent = 'TNT · Global Maritime Intelligence';
+      title.textContent = 'TNT • Global Maritime Intelligence';
     }
 
     var sub = document.querySelector('.header-title p');
@@ -283,30 +283,51 @@
     return window.matchMedia && window.matchMedia('(max-width: 860px)').matches;
   }
 
+  function userInitials(user) {
+    var name = (user && (user.displayName || user.username)) || 'U';
+    var parts = String(name).trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return String(name).slice(0, 2).toUpperCase();
+  }
+
+  function roleLabel(role) {
+    var r = String(role || '').toLowerCase();
+    if (r === 'admin') return 'Administrator';
+    if (r === 'analyst') return 'Analyst';
+    if (r === 'viewer') return 'Viewer';
+    return r ? r.charAt(0).toUpperCase() + r.slice(1) : 'User';
+  }
+
   // ── UX: user session bar + logout + password change ───────────────
   function mountUserChrome() {
     var user = window.__TNT_USER__;
     if (!user) return;
+    if (document.getElementById('tnt-user-bar')) return;
 
-    var headerTop = document.querySelector('.header-top');
-    if (!headerTop || document.getElementById('tnt-user-bar')) return;
+    var host =
+      document.querySelector('.main-topbar') ||
+      document.querySelector('.header-top');
+    if (!host) return;
 
     var bar = document.createElement('div');
     bar.id = 'tnt-user-bar';
     bar.className = 'tnt-user-bar';
     bar.innerHTML =
-      '<img class="tnt-user-avatar" src="' + LOGO_URL + '" alt="" width="32" height="32">' +
       '<div class="tnt-user-meta">' +
       '<span class="tnt-user-name"></span>' +
       '<span class="tnt-user-role"></span>' +
       '</div>' +
+      '<span class="tnt-user-initials" aria-hidden="true"></span>' +
+      '<img class="tnt-user-avatar" src="' + LOGO_URL + '" alt="" width="32" height="32">' +
       '<button type="button" class="tnt-logout" id="tnt-change-pw" title="Change your password">Password</button>' +
       '<button type="button" class="tnt-logout" id="tnt-logout" title="End your session">Sign out</button>';
 
-    bar.querySelector('.tnt-user-name').textContent = user.displayName || user.username;
-    bar.querySelector('.tnt-user-role').textContent = (user.role || '').toUpperCase();
+    var display = user.displayName || user.username;
+    bar.querySelector('.tnt-user-name').textContent = display;
+    bar.querySelector('.tnt-user-role').textContent = roleLabel(user.role);
+    bar.querySelector('.tnt-user-initials').textContent = userInitials(user);
 
-    headerTop.appendChild(bar);
+    host.appendChild(bar);
 
     document.getElementById('tnt-logout').addEventListener('click', async function () {
       if (!window.confirm('Sign out of TNT Maritime Intelligence?')) return;
@@ -399,31 +420,45 @@
     document.getElementById('tnt-pw-current').focus();
   }
 
-  // ── UX: welcome strip (once per session) ───────────────────────────
+  // ── UX: welcome strip ──────────────────────────────────────────────
   function mountWelcome() {
     var user = window.__TNT_USER__;
-    if (!user || sessionStorage.getItem('tnt-welcome-dismissed')) return;
+    var topbar = document.querySelector('.main-topbar');
     var main = document.querySelector('.main');
     if (!main || document.getElementById('tnt-welcome')) return;
 
-    var name = user.displayName || user.username || 'there';
+    var name = (user && (user.displayName || user.username)) || 'there';
+    // Prefer first name / username for the greeting like the mockup
+    var greet = name;
+    if (user && user.username) greet = user.username;
+    else if (name.indexOf(' ') > 0) greet = name.split(/\s+/)[0];
+
     var bar = document.createElement('div');
     bar.id = 'tnt-welcome';
     bar.className = 'tnt-welcome';
     bar.innerHTML =
-      '<img src="' + LOGO_URL + '" alt="">' +
+      '<span class="tnt-welcome-ico" aria-hidden="true">' +
+      '<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+      '</span>' +
       '<div class="tnt-welcome-text">' +
-      'Welcome back, <strong></strong> — use Quick filters below, press <kbd>/</kbd> to search, or open Multi-Port for recruit opportunities.' +
+      'Welcome back, <strong></strong> — filter corridors in the sidebar, then open a row for full voyage &amp; TNT context.' +
       '</div>' +
       '<button type="button" class="tnt-welcome-dismiss" id="tnt-welcome-dismiss" aria-label="Dismiss welcome">×</button>';
-    bar.querySelector('strong').textContent = name;
+    bar.querySelector('strong').textContent = greet;
 
-    main.insertBefore(bar, main.firstChild);
+    if (topbar) {
+      topbar.insertBefore(bar, topbar.firstChild);
+    } else {
+      main.insertBefore(bar, main.firstChild);
+    }
 
-    document.getElementById('tnt-welcome-dismiss').addEventListener('click', function () {
-      sessionStorage.setItem('tnt-welcome-dismissed', '1');
-      bar.remove();
-    });
+    var dismiss = document.getElementById('tnt-welcome-dismiss');
+    if (dismiss) {
+      dismiss.addEventListener('click', function () {
+        sessionStorage.setItem('tnt-welcome-dismissed', '1');
+        bar.remove();
+      });
+    }
   }
 
   // ── UX: search shortcut hint ───────────────────────────────────────
@@ -434,6 +469,13 @@
     wrap.className = 'tnt-search-wrap';
     input.parentNode.insertBefore(wrap, input);
     wrap.appendChild(input);
+    var ico = document.createElement('span');
+    ico.className = 'tnt-search-ico';
+    ico.setAttribute('aria-hidden', 'true');
+    ico.innerHTML =
+      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">' +
+      '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+    wrap.appendChild(ico);
     var kbd = document.createElement('span');
     kbd.className = 'tnt-kbd';
     kbd.textContent = '/';
@@ -1013,16 +1055,524 @@
     });
   }
 
+  // ── Dashboard shell: dark sidebar layout matching the mockup ───────
+  var NAV_ICONS = {
+    table:
+      '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>',
+    analytics:
+      '<svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15v-4"/><path d="M12 15V8"/><path d="M16 15v-6"/></svg>',
+    multiport:
+      '<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M10.5 10.5l3 3"/></svg>',
+    report:
+      '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>',
+  };
+
+  var SC_ICONS = [
+    { cls: 'blue', svg: '<svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15v-5"/><path d="M12 15V7"/><path d="M16 15v-3"/></svg>' },
+    { cls: 'teal', svg: '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7z"/><path d="M9 12l2 2 4-4"/></svg>' },
+    { cls: 'purple', svg: '<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V6l-8-3-8 3v6c0 6 8 10 8 10z"/></svg>' },
+    { cls: 'red', svg: '<svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 4.3L2.8 18a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0z"/></svg>' },
+    { cls: 'amber', svg: '<svg viewBox="0 0 24 24"><path d="M3 17l6-8 4 5 3-4 5 7"/><path d="M3 17h18"/></svg>' },
+    { cls: 'cyan', svg: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>' },
+  ];
+
+  var SC_LABELS = [
+    'Total Corridors',
+    'Prompt Opportunities',
+    'TNT Present',
+    'Without TNT',
+    'Total Volume',
+    'TNT Coverage (Voyages)',
+  ];
+
+  var COUNTRY_FLAG = {
+    'Saudi Arabia': '🇸🇦', China: '🇨🇳', Brazil: '🇧🇷', Australia: '🇦🇺', USA: '🇺🇸',
+    'United States': '🇺🇸', Singapore: '🇸🇬', Netherlands: '🇳🇱', Germany: '🇩🇪',
+    'United Kingdom': '🇬🇧', UK: '🇬🇧', India: '🇮🇳', Japan: '🇯🇵', Korea: '🇰🇷',
+    'South Korea': '🇰🇷', UAE: '🇦🇪', 'United Arab Emirates': '🇦🇪', Qatar: '🇶🇦',
+    Kuwait: '🇰🇼', Oman: '🇴🇲', Iraq: '🇮🇶', Iran: '🇮🇷', Russia: '🇷🇺',
+    Norway: '🇳🇴', Spain: '🇪🇸', France: '🇫🇷', Italy: '🇮🇹', Belgium: '🇧🇪',
+    'South Africa': '🇿🇦', Nigeria: '🇳🇬', Angola: '🇦🇴', Canada: '🇨🇦',
+    Mexico: '🇲🇽', Chile: '🇨🇱', Argentina: '🇦🇷', Colombia: '🇨🇴', Peru: '🇵🇪',
+    Indonesia: '🇮🇩', Malaysia: '🇲🇾', Thailand: '🇹🇭', Vietnam: '🇻🇳',
+    Philippines: '🇵🇭', Taiwan: '🇹🇼', Egypt: '🇪🇬', Turkey: '🇹🇷', Greece: '🇬🇷',
+    Poland: '🇵🇱', Sweden: '🇸🇪', Denmark: '🇩🇰', Finland: '🇫🇮', Portugal: '🇵🇹',
+    Morocco: '🇲🇦', Algeria: '🇩🇿', Libya: '🇱🇾', Panama: '🇵🇦', Ecuador: '🇪🇨',
+    Venezuela: '🇻🇪', Uruguay: '🇺🇾', 'New Zealand': '🇳🇿', Kazakhstan: '🇰🇿',
+  };
+
+  var GROUP_EMOJI = {
+    Energy: '🛢️', Minerals: '⛏️', Agri: '🌾', Reefer: '❄️', Forest: '🪵',
+  };
+
+  function escHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function flagFor(country) {
+    return COUNTRY_FLAG[country] || '🌐';
+  }
+
+  function mountDashboardShell() {
+    if (document.body.classList.contains('tnt-shell')) return;
+
+    var header = document.querySelector('.app-header');
+    var sidebar = document.querySelector('.sidebar');
+    var main = document.querySelector('.main');
+    if (!header || !sidebar || !main) return;
+
+    document.body.classList.add('tnt-shell');
+
+    var brand = header.querySelector('.header-brand');
+    var nav = header.querySelector('.nav-tabs');
+    var scroll = sidebar.querySelector('.sidebar-scroll');
+
+    if (brand) {
+      brand.classList.add('sidebar-brand');
+      sidebar.insertBefore(brand, sidebar.firstChild);
+    }
+
+    if (nav) {
+      nav.classList.add('sidebar-nav');
+      var afterBrand = sidebar.querySelector('.sidebar-brand');
+      if (afterBrand && afterBrand.nextSibling) {
+        sidebar.insertBefore(nav, afterBrand.nextSibling);
+      } else {
+        sidebar.insertBefore(nav, sidebar.firstChild);
+      }
+
+      var views = ['table', 'analytics', 'multiport', 'report'];
+      var labels = ['Corridors', 'Analytics', 'Multi-Port', 'Report Builder'];
+      nav.querySelectorAll('.nav-tab').forEach(function (tab, i) {
+        var key = views[i] || 'table';
+        tab.innerHTML =
+          '<span class="nav-ico" aria-hidden="true">' + (NAV_ICONS[key] || '') + '</span>' +
+          '<span>' + labels[i] + '</span>';
+        tab.setAttribute('data-view', key);
+      });
+    }
+
+    if (scroll && !document.getElementById('tnt-filters-hdr')) {
+      var fhdr = document.createElement('div');
+      fhdr.id = 'tnt-filters-hdr';
+      fhdr.className = 'tnt-filters-hdr';
+      fhdr.innerHTML =
+        '<span>Filters</span>' +
+        '<button type="button" class="tnt-reset-all" id="tnt-reset-all">Reset all</button>';
+      sidebar.insertBefore(fhdr, scroll);
+      fhdr.querySelector('#tnt-reset-all').addEventListener('click', function () {
+        if (typeof rst === 'function') rst();
+      });
+    }
+
+    // Promote search out of accordion so it sits under FILTERS like the mockup
+    var searchInput = document.getElementById('f-q');
+    if (searchInput && !document.getElementById('tnt-filter-search')) {
+      var searchSec = searchInput.closest('.sidebar-section');
+      var searchHost = document.createElement('div');
+      searchHost.id = 'tnt-filter-search';
+      searchHost.className = 'tnt-filter-search';
+      var fg = searchInput.closest('.fg') || searchInput.parentNode;
+      searchHost.appendChild(fg);
+      var insertBeforeEl = scroll || sidebar.querySelector('.sidebar-scroll');
+      if (insertBeforeEl) {
+        sidebar.insertBefore(searchHost, insertBeforeEl);
+      }
+      if (searchSec) searchSec.remove();
+    }
+
+    // Clean section headers (drop emoji, add chevron)
+    sidebar.querySelectorAll('.sec-hdr').forEach(function (hdr) {
+      var text = (hdr.textContent || '')
+        .replace(/[▼▲▸▾▴›]/g, '')
+        .replace(/[^\x20-\x7E&]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      // Fallback clean labels
+      var lower = text.toLowerCase();
+      if (lower.indexOf('search') !== -1) text = 'Search';
+      else if (lower.indexOf('ports') !== -1) text = 'Ports & Countries';
+      else if (lower.indexOf('commodity') !== -1) text = 'Commodity & Vessel';
+      else if (lower.indexOf('operator') !== -1) text = 'Operators';
+      else if (lower.indexOf('towage') !== -1) text = 'Towage & TNT';
+      if (!text) text = 'Filters';
+      hdr.innerHTML = '<span>' + escHtml(text) + '</span><span class="sec-chevron">›</span>';
+    });
+
+    var actions = sidebar.querySelector('.sb-actions');
+    if (actions) {
+      actions.innerHTML =
+        '<button class="btn btn-out" type="button" id="tnt-btn-csv">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>' +
+        'Export View (CSV)</button>' +
+        '<button class="btn btn-grn" type="button" id="tnt-btn-report">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>' +
+        'Report Builder</button>' +
+        '<button class="btn btn-print" type="button" id="tnt-btn-print">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>' +
+        'Print</button>';
+      document.getElementById('tnt-btn-csv').addEventListener('click', function () {
+        if (typeof csvExp === 'function') csvExp();
+      });
+      document.getElementById('tnt-btn-report').addEventListener('click', function () {
+        if (typeof sw === 'function') sw('report');
+      });
+      document.getElementById('tnt-btn-print').addEventListener('click', function () {
+        window.print();
+      });
+    }
+
+    if (!document.getElementById('tnt-sidebar-foot')) {
+      var foot = document.createElement('div');
+      foot.id = 'tnt-sidebar-foot';
+      foot.className = 'sidebar-foot';
+      foot.innerHTML =
+        '<button type="button" class="tnt-close-detail" id="tnt-close-detail">Close detail</button>' +
+        '<p>Click a corridor row for full voyage &amp; TNT context.</p>';
+      sidebar.appendChild(foot);
+      foot.querySelector('#tnt-close-detail').addEventListener('click', function () {
+        if (typeof clsDp === 'function') clsDp();
+      });
+    }
+
+    // Main topbar host for welcome + user chrome
+    if (!document.querySelector('.main-topbar')) {
+      var topbar = document.createElement('div');
+      topbar.className = 'main-topbar';
+      main.insertBefore(topbar, main.firstChild);
+    }
+
+    var topbarEl = document.querySelector('.main-topbar');
+    if (topbarEl && !document.getElementById('tnt-mobile-filters')) {
+      var mob = document.createElement('button');
+      mob.type = 'button';
+      mob.id = 'tnt-mobile-filters';
+      mob.className = 'tnt-mobile-filters';
+      mob.setAttribute('aria-label', 'Open filters');
+      mob.innerHTML =
+        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">' +
+        '<path d="M4 6h16M7 12h10M10 18h4"/></svg>';
+      topbarEl.insertBefore(mob, topbarEl.firstChild);
+      mob.addEventListener('click', function () {
+        toggleFilters();
+      });
+    }
+
+    // Mockup order: summary cards above the results bar
+    var sumBar = document.querySelector('.sum-bar');
+    var resBar = document.querySelector('.res-bar');
+    if (sumBar && resBar && resBar.nextElementSibling === sumBar) {
+      main.insertBefore(sumBar, resBar);
+    }
+
+    // Metric cards
+    if (sumBar) {
+      sumBar.querySelectorAll('.sc').forEach(function (card, i) {
+        var num = card.querySelector('.sc-num');
+        var lbl = card.querySelector('.sc-lbl');
+        if (!num) return;
+        var ico = SC_ICONS[i] || SC_ICONS[0];
+        var label = SC_LABELS[i] || (lbl ? lbl.textContent : '');
+        var numHtml = num.outerHTML;
+        card.innerHTML =
+          '<span class="sc-ico ' + ico.cls + '" aria-hidden="true">' + ico.svg + '</span>' +
+          '<div class="sc-body">' + numHtml + '<div class="sc-lbl">' + escHtml(label) + '</div></div>';
+        // Restore inline color reset — CSS forces dark text
+        var newNum = card.querySelector('.sc-num');
+        if (newNum) newNum.removeAttribute('style');
+      });
+    }
+
+    // Rows-per-page label via CSS; simplify select options text
+    var pgsz = document.getElementById('pgsz');
+    if (pgsz) {
+      Array.prototype.forEach.call(pgsz.options, function (opt) {
+        if (opt.value === '50') opt.textContent = '50';
+        else if (opt.value === '100') opt.textContent = '100';
+        else if (opt.value === '200') opt.textContent = '200';
+        else if (opt.value === '9999') opt.textContent = 'All';
+      });
+    }
+
+    // Add chevron column + tidy header labels (keep existing th nodes for sort listeners)
+    var theadRow = document.querySelector('#vw-table thead tr');
+    if (theadRow && !theadRow.querySelector('.th-chev')) {
+      var th = document.createElement('th');
+      th.className = 'th-chev';
+      th.setAttribute('aria-hidden', 'true');
+      theadRow.appendChild(th);
+    }
+    if (theadRow) {
+      var headerLabels = [
+        'Origin Port',
+        'Destination Port',
+        'Commodity',
+        'Mt',
+        'Voyage',
+        'TNT',
+        'Shipowners',
+        'Charterers',
+        'Towage — Origin',
+        'Towage — Dest',
+      ];
+      theadRow.querySelectorAll('th').forEach(function (thEl, idx) {
+        if (thEl.classList.contains('th-chev')) {
+          thEl.textContent = '';
+          return;
+        }
+        var label = headerLabels[idx] || (thEl.textContent || '').replace(/[↕↑↓]/g, '').trim();
+        var showSort = idx <= 4;
+        thEl.innerHTML = escHtml(label) + (showSort ? ' <span class="si">↕</span>' : '');
+      });
+    }
+
+    // Hide legacy header completely
+    header.setAttribute('hidden', 'hidden');
+    header.style.display = 'none';
+  }
+
+  function enhanceTableRender() {
+    if (typeof rndTbl !== 'function') return;
+
+    window.rndTbl = function () {
+      var ps = parseInt((document.getElementById('pgsz') || {}).value, 10) || 50;
+      var st = (PG - 1) * ps;
+      var rows = F.slice(st, st + ps);
+      var tb = document.getElementById('tbody');
+      if (!tb) return;
+
+      if (!rows.length) {
+        tb.innerHTML =
+          '<tr><td colspan="11"><div class="empty"><h3>No corridors match</h3><p>Adjust filters</p></div></td></tr>';
+        var pagEmpty = document.getElementById('pag');
+        if (pagEmpty) pagEmpty.innerHTML = '';
+        return;
+      }
+
+      function tBdg(r) {
+        var check =
+          '<span class="tnt-check" title="TNT present">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg>' +
+          '</span>';
+        if (r.tf === '> Origin / > Dest') {
+          return check + ' <span class="bdg bdg-b">' + escHtml(r.to) + ' + ' + escHtml(r.td) + '</span>';
+        }
+        if (r.tf === '> Origin') {
+          return '<span class="bdg bdg-o">' + escHtml(r.to || 'Origin') + '</span>';
+        }
+        if (r.tf === '> Dest') {
+          return '<span class="bdg bdg-d">' + escHtml(r.td || 'Dest') + '</span>';
+        }
+        return '<span class="bdg bdg-n">—</span>';
+      }
+
+      function tgs(a, cl) {
+        if (!a || !a.length) return '<span style="color:#CBD5E1">—</span>';
+        return a
+          .slice(0, 3)
+          .map(function (x) {
+            return '<span class="tag ' + cl + '" title="' + escHtml(x) + '">' + escHtml(x) + '</span>';
+          })
+          .join('');
+      }
+
+      function twTgs(a) {
+        if (!a || !a.length) return '<span style="color:#CBD5E1">—</span>';
+        return a
+          .slice(0, 3)
+          .map(function (x) {
+            var isT =
+              /Towage|Sulnorte|Ocean|Fairplay|CPT/i.test(x);
+            return (
+              '<span class="tag ' +
+              (isT ? 'tag-t' : 'tag-o') +
+              '" title="' +
+              escHtml(x) +
+              '">' +
+              escHtml(x) +
+              '</span>'
+            );
+          })
+          .join('');
+      }
+
+      function portCell(port, country) {
+        return (
+          '<div class="port-cell">' +
+          '<span class="flag" title="' +
+          escHtml(country) +
+          '">' +
+          flagFor(country) +
+          '</span>' +
+          '<div class="port-meta"><div class="pn">' +
+          escHtml(port) +
+          '</div><div class="cn">' +
+          escHtml(country) +
+          '</div></div></div>'
+        );
+      }
+
+      function cmCell(r) {
+        var g = r.g || '';
+        var cls = String(g).toLowerCase().replace(/\s+/g, '');
+        var emoji = GROUP_EMOJI[g] || '📦';
+        return (
+          '<div class="cm-cell">' +
+          '<span class="cm-ico ' +
+          escHtml(cls) +
+          '">' +
+          emoji +
+          '</span>' +
+          '<div><div class="cm">' +
+          escHtml(r.c) +
+          '</div><div class="gn">' +
+          escHtml(g) +
+          '</div></div></div>'
+        );
+      }
+
+      tb.innerHTML = rows
+        .map(function (r, i) {
+          var rc =
+            r.tf === '> Origin / > Dest' ? 'r-both' : r.tf && r.tf !== '-' ? 'r-one' : '';
+          return (
+            '<tr class="' +
+            rc +
+            '" onclick="shDp(' +
+            (st + i) +
+            ')">' +
+            '<td>' +
+            portCell(r.o, r.co) +
+            '</td>' +
+            '<td class="hi">' +
+            portCell(r.d, r.cd) +
+            '</td>' +
+            '<td>' +
+            cmCell(r) +
+            '</td>' +
+            '<td class="nr hi">' +
+            r.mt.toFixed(1) +
+            '</td>' +
+            '<td class="nr hi">' +
+            r.ca.toLocaleString() +
+            '</td>' +
+            '<td>' +
+            tBdg(r) +
+            '</td>' +
+            '<td class="hi">' +
+            tgs(r.ow, 'tag-o') +
+            '</td>' +
+            '<td class="hi">' +
+            tgs(r.ch, 'tag-c') +
+            '</td>' +
+            '<td class="hi">' +
+            twTgs(r.tw) +
+            '</td>' +
+            '<td class="hi">' +
+            twTgs(r.tx) +
+            '</td>' +
+            '<td class="td-chev"><span class="row-chev">›</span></td>' +
+            '</tr>'
+          );
+        })
+        .join('');
+
+      rndPag(F.length, ps);
+    };
+
+    window.rndPag = function (tot, ps) {
+      var pages = Math.max(1, Math.ceil(tot / ps) || 1);
+      var from = tot ? (PG - 1) * ps + 1 : 0;
+      var to = Math.min(PG * ps, tot);
+      var h =
+        '<div class="pag-left">Showing ' +
+        from.toLocaleString() +
+        ' to ' +
+        to.toLocaleString() +
+        ' of ' +
+        tot.toLocaleString() +
+        ' corridors</div>';
+      h += '<div class="pag-mid">';
+      h +=
+        '<button class="pb" type="button" ' +
+        (PG <= 1 ? 'disabled' : '') +
+        ' onclick="gp(' +
+        Math.max(1, PG - 1) +
+        ')">‹</button>';
+      var s = Math.max(1, PG - 2);
+      var e = Math.min(pages, PG + 2);
+      if (s > 1) {
+        h += '<button class="pb" type="button" onclick="gp(1)">1</button>';
+        if (s > 2) h += '<span class="pi">…</span>';
+      }
+      for (var p = s; p <= e; p++) {
+        h +=
+          '<button class="pb' +
+          (p === PG ? ' act' : '') +
+          '" type="button" onclick="gp(' +
+          p +
+          ')">' +
+          p +
+          '</button>';
+      }
+      if (e < pages) {
+        if (e < pages - 1) h += '<span class="pi">…</span>';
+        h +=
+          '<button class="pb" type="button" onclick="gp(' +
+          pages +
+          ')">' +
+          pages +
+          '</button>';
+      }
+      h +=
+        '<button class="pb" type="button" ' +
+        (PG >= pages ? 'disabled' : '') +
+        ' onclick="gp(' +
+        Math.min(pages, PG + 1) +
+        ')">›</button>';
+      h += '</div>';
+      h +=
+        '<div class="pag-right"><span>Go to page</span>' +
+        '<input type="number" id="tnt-goto-page" min="1" max="' +
+        pages +
+        '" value="' +
+        PG +
+        '" aria-label="Go to page">' +
+        '<button type="button" class="pb-go" id="tnt-goto-btn" aria-label="Go">›</button></div>';
+      var pag = document.getElementById('pag');
+      if (!pag) return;
+      pag.innerHTML = h;
+      var btn = document.getElementById('tnt-goto-btn');
+      var inp = document.getElementById('tnt-goto-page');
+      if (btn && inp) {
+        function jump() {
+          var n = parseInt(inp.value, 10);
+          if (!n || n < 1) n = 1;
+          if (n > pages) n = pages;
+          gp(n);
+        }
+        btn.addEventListener('click', jump);
+        inp.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter') jump();
+        });
+      }
+    };
+  }
+
   function boot() {
+    mountDashboardShell();
     applyBranding();
+    enhanceTableRender();
     mountUserChrome();
     mountSidebarControls();
     mountWelcome();
     mountSearchHint();
     mountDebouncedInputs();
-    mountQuickFilters();
-    mountHelpBar();
-    fixHelpBarLayout();
+    // Quick filters / help bar intentionally omitted — not in the mockup shell
     mountScrollTop();
     openKeySidebarSections();
     polishSidebarA11y();
@@ -1031,6 +1581,21 @@
     polishTableEmpty();
     polishOtherEmpty();
     updateFilterBadge();
+
+    // Re-render table with enhanced row chrome once DATA is ready
+    if (typeof F !== 'undefined' && F && F.length && typeof rndTbl === 'function') {
+      try {
+        rndTbl();
+      } catch (_) { /* init may still be running */ }
+    } else {
+      setTimeout(function () {
+        if (typeof rndTbl === 'function' && typeof F !== 'undefined' && F && F.length) {
+          try {
+            rndTbl();
+          } catch (_) { /* ignore */ }
+        }
+      }, 50);
+    }
 
     var observer = new MutationObserver(function () {
       polishEmpty();
@@ -1041,12 +1606,11 @@
     if (rpt) observer.observe(rpt, { childList: true, subtree: true });
     var tbl = document.querySelector('#vw-table .tbl-wrap');
     if (tbl) observer.observe(tbl, { childList: true, subtree: true });
-    var mp = document.getElementById('vw-multiport');
+    var mp = document.getElementById('mp-multiport') || document.getElementById('vw-multiport');
     if (mp) observer.observe(mp, { childList: true, subtree: true });
     var an = document.getElementById('vw-analytics');
     if (an) observer.observe(an, { childList: true, subtree: true });
 
-    // Post-login toast via query flag
     try {
       var params = new URLSearchParams(window.location.search);
       if (params.get('welcome') === '1') {

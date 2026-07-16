@@ -147,6 +147,7 @@ function injectIntoHtml(html, user) {
     '<link rel="icon" type="image/png" href="/images/tnt-logo-round.png">',
     '<link rel="apple-touch-icon" href="/images/tnt-logo-round.png">',
     '<link rel="stylesheet" href="/enhancements/app-ux.css">',
+    '<link rel="stylesheet" href="/enhancements/dashboard-shell.css">',
     `<script>window.__TNT_USER__=${userJson};</script>`,
     '<script src="/enhancements/app-patches.js" defer></script>',
   ].join('\n');
