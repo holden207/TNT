@@ -23,6 +23,44 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 const SALT_ROUNDS = 12;
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
 const DEFAULT_ROLE = 'viewer';
+const PKG = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  } catch (_) {
+    return { version: '0.0.0' };
+  }
+})();
+
+/** Content-hash asset version — busts CDN/browser caches after every deploy. */
+function fileFingerprint(relPath) {
+  try {
+    const buf = fs.readFileSync(path.join(ROOT, relPath));
+    return crypto.createHash('sha1').update(buf).digest('hex').slice(0, 10);
+  } catch (_) {
+    return '0';
+  }
+}
+
+const DEPLOY_REV =
+  process.env.RENDER_GIT_COMMIT ||
+  process.env.SOURCE_VERSION ||
+  process.env.GIT_COMMIT ||
+  '';
+
+const ASSET_VERSION = [
+  PKG.version || '0',
+  fileFingerprint('public/enhancements/dashboard-shell.css'),
+  fileFingerprint('public/enhancements/app-patches.js'),
+  fileFingerprint('public/enhancements/app-ux.css'),
+  DEPLOY_REV.slice(0, 7),
+]
+  .filter(Boolean)
+  .join('.')
+  .replace(/[^a-zA-Z0-9._-]/g, '');
+
+function assetUrl(pathname) {
+  return `${pathname}?v=${encodeURIComponent(ASSET_VERSION)}`;
+}
 
 /** @type {Map<string, { userId: string, username: string, displayName: string, role: string, expires: number }>} */
 const sessions = new Map();
@@ -144,12 +182,16 @@ function injectIntoHtml(html, user) {
   }).replace(/</g, '\\u003c');
 
   const inject = [
+    `<meta name="tnt-asset-version" content="${ASSET_VERSION}">`,
+    '<link rel="preconnect" href="https://fonts.googleapis.com">',
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">',
     '<link rel="icon" type="image/png" href="/images/tnt-logo-round.png">',
     '<link rel="apple-touch-icon" href="/images/tnt-logo-round.png">',
-    '<link rel="stylesheet" href="/enhancements/app-ux.css">',
-    '<link rel="stylesheet" href="/enhancements/dashboard-shell.css">',
-    `<script>window.__TNT_USER__=${userJson};</script>`,
-    '<script src="/enhancements/app-patches.js" defer></script>',
+    `<link rel="stylesheet" href="${assetUrl('/enhancements/app-ux.css')}">`,
+    `<link rel="stylesheet" href="${assetUrl('/enhancements/dashboard-shell.css')}">`,
+    `<script>window.__TNT_USER__=${userJson};window.__TNT_ASSET_VERSION__=${JSON.stringify(ASSET_VERSION)};</script>`,
+    `<script src="${assetUrl('/enhancements/app-patches.js')}" defer></script>`,
   ].join('\n');
 
   if (html.includes('</head>')) {
@@ -198,9 +240,30 @@ const registerLimiter = rateLimit({
 });
 
 // Public assets for login + enhancements
+// Enhancements are versioned via ?v= in HTML; short revalidation avoids stale UI after deploys.
 app.use('/auth', express.static(path.join(ROOT, 'public', 'auth'), { maxAge: '1h' }));
-app.use('/enhancements', express.static(path.join(ROOT, 'public', 'enhancements'), { maxAge: '1h' }));
+app.use(
+  '/enhancements',
+  express.static(path.join(ROOT, 'public', 'enhancements'), {
+    etag: true,
+    lastModified: true,
+    setHeaders(res) {
+      // Prefer revalidation over a sticky 1h cache that can outlive a deploy.
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    },
+  })
+);
 app.use('/images', express.static(path.join(ROOT, 'public', 'images'), { maxAge: '1h' }));
+
+app.get('/api/version', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    ok: true,
+    version: PKG.version || null,
+    assetVersion: ASSET_VERSION,
+    deployRev: DEPLOY_REV || null,
+  });
+});
 
 app.get('/login', (req, res) => {
   if (getSession(req)) return res.redirect('/');

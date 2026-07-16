@@ -875,18 +875,26 @@ body.tnt-sidebar-collapsed .tnt-sidebar-toggle {
   filter: brightness(0.98);
 }
 
-/* Sidebar section chevron affordance */
-.sec-hdr span {
+/* Sidebar section chevron affordance — only rotate the indicator, never the label */
+.sec-hdr > span:last-child,
+.sec-hdr .sec-chevron {
   transition: transform 0.15s;
   display: inline-block;
 }
 
-.sec-hdr[aria-expanded="true"] span,
-.sidebar-section:has(.sec-body.open) .sec-hdr span {
+.sec-hdr > span:not(:last-child):not(.sec-chevron) {
+  transform: none !important;
+}
+
+.sec-hdr[aria-expanded="true"] > span:last-child,
+.sec-hdr[aria-expanded="true"] .sec-chevron,
+.sidebar-section:has(.sec-body.open) .sec-hdr > span:last-child,
+.sidebar-section:has(.sec-body.open) .sec-hdr .sec-chevron {
   transform: rotate(0deg);
 }
 
-.sec-hdr[aria-expanded="false"] span {
+.sec-hdr[aria-expanded="false"] > span:last-child,
+.sec-hdr[aria-expanded="false"] .sec-chevron {
   transform: rotate(-90deg);
 }
 

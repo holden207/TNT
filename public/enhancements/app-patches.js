@@ -1118,14 +1118,12 @@
   }
 
   function mountDashboardShell() {
-    if (document.body.classList.contains('tnt-shell')) return;
+    if (document.body.dataset.tntShellMounted === '1') return true;
 
     var header = document.querySelector('.app-header');
     var sidebar = document.querySelector('.sidebar');
     var main = document.querySelector('.main');
-    if (!header || !sidebar || !main) return;
-
-    document.body.classList.add('tnt-shell');
+    if (!header || !sidebar || !main) return false;
 
     var brand = header.querySelector('.header-brand');
     var nav = header.querySelector('.nav-tabs');
@@ -1333,6 +1331,11 @@
     // Hide legacy header completely
     header.setAttribute('hidden', 'hidden');
     header.style.display = 'none';
+
+    // Apply shell styles only after DOM has been restructured
+    document.body.classList.add('tnt-shell');
+    document.body.dataset.tntShellMounted = '1';
+    return true;
   }
 
   function enhanceTableRender() {
@@ -1563,39 +1566,61 @@
     };
   }
 
-  function boot() {
-    mountDashboardShell();
-    applyBranding();
-    enhanceTableRender();
-    mountUserChrome();
-    mountSidebarControls();
-    mountWelcome();
-    mountSearchHint();
-    mountDebouncedInputs();
-    // Quick filters / help bar intentionally omitted — not in the mockup shell
-    mountScrollTop();
-    openKeySidebarSections();
-    polishSidebarA11y();
-    restorePreferences();
-    polishEmpty();
-    polishTableEmpty();
-    polishOtherEmpty();
-    updateFilterBadge();
-
-    // Re-render table with enhanced row chrome once DATA is ready
-    if (typeof F !== 'undefined' && F && F.length && typeof rndTbl === 'function') {
-      try {
-        rndTbl();
-      } catch (_) { /* init may still be running */ }
-    } else {
-      setTimeout(function () {
-        if (typeof rndTbl === 'function' && typeof F !== 'undefined' && F && F.length) {
-          try {
-            rndTbl();
-          } catch (_) { /* ignore */ }
-        }
-      }, 50);
+  function safeCall(fn) {
+    try {
+      return fn();
+    } catch (err) {
+      if (typeof console !== 'undefined' && console.error) {
+        console.error('[TNT] enhancement step failed:', err);
+      }
+      return undefined;
     }
+  }
+
+  function refreshEnhancedTable() {
+    if (typeof rndTbl !== 'function') return;
+    if (typeof F === 'undefined' || !F || !F.length) return;
+    safeCall(function () {
+      rndTbl();
+    });
+  }
+
+  var bootDone = false;
+
+  function boot() {
+    var shellOk = !!safeCall(mountDashboardShell);
+    if (!shellOk && document.body.dataset.tntShellMounted !== '1') {
+      // App markup may not be ready yet (slow host / late parse) — retry below
+      return false;
+    }
+
+    if (bootDone) {
+      refreshEnhancedTable();
+      return true;
+    }
+    bootDone = true;
+
+    safeCall(applyBranding);
+    safeCall(enhanceTableRender);
+    safeCall(mountUserChrome);
+    safeCall(mountSidebarControls);
+    safeCall(mountWelcome);
+    safeCall(mountSearchHint);
+    safeCall(mountDebouncedInputs);
+    // Quick filters / help bar intentionally omitted — not in the mockup shell
+    safeCall(mountScrollTop);
+    safeCall(openKeySidebarSections);
+    safeCall(polishSidebarA11y);
+    safeCall(restorePreferences);
+    safeCall(polishEmpty);
+    safeCall(polishTableEmpty);
+    safeCall(polishOtherEmpty);
+    safeCall(updateFilterBadge);
+
+    refreshEnhancedTable();
+    [50, 200, 800].forEach(function (ms) {
+      setTimeout(refreshEnhancedTable, ms);
+    });
 
     var observer = new MutationObserver(function () {
       polishEmpty();
@@ -1620,11 +1645,32 @@
         window.history.replaceState({}, '', next);
       }
     } catch (_) { /* ignore */ }
+
+    return true;
+  }
+
+  function scheduleBoot() {
+    safeCall(boot);
+    // Retry until shell mounts — covers race with the large inline DATA script on slow hosts
+    var attempts = 0;
+    var timer = setInterval(function () {
+      attempts += 1;
+      if (document.body.dataset.tntShellMounted === '1' || attempts > 40) {
+        clearInterval(timer);
+        if (document.body.dataset.tntShellMounted === '1') refreshEnhancedTable();
+        return;
+      }
+      safeCall(boot);
+    }, 100);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', scheduleBoot);
   } else {
-    setTimeout(boot, 0);
+    scheduleBoot();
   }
+  window.addEventListener('load', function () {
+    if (document.body.dataset.tntShellMounted !== '1') scheduleBoot();
+    else refreshEnhancedTable();
+  });
 })();
