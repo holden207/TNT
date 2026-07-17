@@ -43,7 +43,6 @@
   function applyBranding() {
     var logo = document.querySelector('.header-logo');
     if (logo) {
-      logo.src = LOGO_URL;
       logo.alt = 'Tug Network Team';
       logo.width = 56;
       logo.height = 56;
@@ -158,6 +157,483 @@
     if (rqa) rqa.innerHTML = pills.join('');
     return result;
   };
+
+  // ── Fix: Report Builder aggregation (multi-value dims, totals, Port Calls) ──
+  var EXPAND_DIMS = { tntm: 1, owner: 1, chtr: 1, tug: 1 };
+
+  function uniqNonEmpty(arr) {
+    var out = [];
+    var seen = Object.create(null);
+    (arr || []).forEach(function (x) {
+      if (!x) return;
+      var k = String(x);
+      if (seen[k]) return;
+      seen[k] = 1;
+      out.push(x);
+    });
+    return out;
+  }
+
+  function portCalls(voy) {
+    return (Number(voy) || 0) * 2; // each voyage ⇒ origin + dest call
+  }
+
+  function summarizeSource(RD) {
+    var vol = 0;
+    var voy = 0;
+    var tnt = 0;
+    var jwl = 0;
+    RD.forEach(function (r) {
+      vol += r.mt;
+      voy += r.ca;
+      if (hasTnt(r.tf)) tnt++;
+      if (r.tf === '> Origin / > Dest') jwl++;
+    });
+    return {
+      n: RD.length,
+      vol: vol,
+      voy: voy,
+      calls: portCalls(voy),
+      tnt: tnt,
+      jwl: jwl,
+    };
+  }
+
+  window.getKeys = function (r, dim) {
+    if (dim === 'o') return [r.o];
+    if (dim === 'd') return [r.d];
+    if (dim === 'co') return [r.co];
+    if (dim === 'cd') return [r.cd];
+    if (dim === 'pair') return [r.o + ' → ' + r.d];
+    if (dim === 'c') return [r.c];
+    if (dim === 'g') return [r.g];
+    if (dim === 'v') return [r.v];
+    if (dim === 'tntp') {
+      if (r.tf === '> Origin / > Dest') return ['Prompt Opportunity (both ends)'];
+      if (r.tf === '> Origin') return ['TNT at Origin only'];
+      if (r.tf === '> Dest') return ['TNT at Dest. only'];
+      return ['No TNT presence'];
+    }
+    if (dim === 'tntm') {
+      var ms = uniqNonEmpty([r.to, r.td]);
+      return ms.length ? ms : ['(none)'];
+    }
+    if (dim === 'owner') {
+      var owners = uniqNonEmpty(r.ow);
+      return owners.length ? owners : ['(none)'];
+    }
+    if (dim === 'chtr') {
+      var chtrs = uniqNonEmpty(r.ch);
+      return chtrs.length ? chtrs : ['(none)'];
+    }
+    if (dim === 'tug') {
+      var tugs = uniqNonEmpty([].concat(r.tw || [], r.tx || []));
+      return tugs.length ? tugs : ['(none)'];
+    }
+    return ['—'];
+  };
+
+  window.runReport = function () {
+    if (!DIMS.length) {
+      alert('Select at least one Group By dimension.');
+      return;
+    }
+    if (DIMS.includes('detail')) {
+      rndDet();
+      return;
+    }
+
+    var dims = DIMS.slice();
+    var hasExpand = dims.some(function (d) {
+      return EXPAND_DIMS[d];
+    });
+    var RD = getReportData();
+    var agg = Object.create(null);
+
+    RD.forEach(function (r, ri) {
+      var keyCombos = [[]];
+      dims.forEach(function (dim) {
+        var vals = getKeys(r, dim);
+        var next = [];
+        keyCombos.forEach(function (existing) {
+          vals.forEach(function (v) {
+            next.push(existing.concat([v]));
+          });
+        });
+        keyCombos = next;
+      });
+
+      keyCombos.forEach(function (combo) {
+        var k = combo.join(' ║ ');
+        if (!agg[k]) {
+          agg[k] = {
+            keys: combo,
+            vol: 0,
+            voy: 0,
+            calls: 0,
+            n: 0,
+            tnt: 0,
+            jwl: 0,
+            ow: new Set(),
+            ch: new Set(),
+            tg: new Set(),
+            tm: new Set(),
+            vts: new Set(),
+            _ids: new Set(),
+          };
+        }
+        var a = agg[k];
+        // Presence attribution: full metrics per matching entity/group.
+        // Deduplicate if the same corridor maps to the same key more than once.
+        if (a._ids.has(ri)) return;
+        a._ids.add(ri);
+        a.vol += r.mt;
+        a.voy += r.ca;
+        a.calls += portCalls(r.ca);
+        a.n++;
+        if (hasTnt(r.tf)) a.tnt++;
+        if (r.tf === '> Origin / > Dest') a.jwl++;
+        (r.ow || []).forEach(function (x) {
+          if (x) a.ow.add(x);
+        });
+        (r.ch || []).forEach(function (x) {
+          if (x) a.ch.add(x);
+        });
+        [].concat(r.tw || [], r.tx || []).forEach(function (x) {
+          if (x) a.tg.add(x);
+        });
+        if (r.to) a.tm.add(r.to);
+        if (r.td) a.tm.add(r.td);
+        if (r.v) a.vts.add(r.v);
+      });
+    });
+
+    var rows = Object.keys(agg)
+      .map(function (k) {
+        var a = agg[k];
+        return {
+          keys: a.keys,
+          vol: a.vol,
+          voy: a.voy,
+          calls: a.calls,
+          n: a.n,
+          tnt: a.tnt,
+          jwl: a.jwl,
+          ow: Array.from(a.ow),
+          ch: Array.from(a.ch),
+          tg: Array.from(a.tg),
+          tm: Array.from(a.tm),
+          vts: Array.from(a.vts),
+        };
+      })
+      .sort(function (a, b) {
+        return b.vol - a.vol;
+      });
+
+    window._rptMeta = Object.assign(summarizeSource(RD), { expanded: hasExpand, groups: rows.length });
+    _rows = rows;
+    _renderRpt = function () {
+      return renderAggTable(rows);
+    };
+    document.getElementById('rpt-wrap').innerHTML = renderAggTable(rows);
+    document.getElementById('rpt-cnt').textContent =
+      rows.length +
+      ' groups · ' +
+      RD.length +
+      ' corridors · ' +
+      RD.reduce(function (s, r) {
+        return s + r.mt;
+      }, 0).toFixed(0) +
+      ' Mt';
+  };
+
+  window.renderAggTable = function (rows) {
+    var sv = cv('cvol');
+    var sy = cv('cvoy');
+    var sc = cv('ccal');
+    var st = cv('ctnt');
+    var sj = cv('cjwl');
+    var scov = cv('ccov');
+    var so = cv('cow');
+    var sch = cv('cch');
+    var stu = cv('ctu');
+    var sm = cv('cmb');
+    var svt = cv('cvt');
+
+    var h = '<table class="rpt-tbl"><thead><tr>';
+    DIMS.forEach(function (dim) {
+      h +=
+        '<th data-k="key_' +
+        dim +
+        '" onclick="srptH(this)">' +
+        DIM_LABELS[dim] +
+        ' ↕</th>';
+    });
+    h += '<th data-k="n" onclick="srptH(this)" class="rn">Corridors ↕</th>';
+    if (sv) h += '<th data-k="vol" onclick="srptH(this)" class="rn">Volume (Mt) ↕</th>';
+    if (sy) h += '<th data-k="voy" onclick="srptH(this)" class="rn">Voyages ↕</th>';
+    if (sc) h += '<th data-k="calls" onclick="srptH(this)" class="rn">Port Calls ↕</th>';
+    if (st) h += '<th data-k="tnt" onclick="srptH(this)" class="rn">TNT Corridors ↕</th>';
+    if (sj) h += '<th data-k="jwl" onclick="srptH(this)" class="rn">Prompt Opp. ↕</th>';
+    if (scov) h += '<th data-k="cov" onclick="srptH(this)" class="rn">TNT Share % ↕</th>';
+    if (svt) h += '<th>Vessel Types</th>';
+    if (so) h += '<th>Shipowners</th>';
+    if (sch) h += '<th>Charterers</th>';
+    if (stu) h += '<th>Tug Companies</th>';
+    if (sm) h += '<th>TNT Members</th>';
+    h += '</tr></thead><tbody>';
+
+    rows.forEach(function (row) {
+      var tntShare = row.n > 0 ? ((row.tnt / row.n) * 100).toFixed(0) + '%' : '—';
+      h += '<tr>';
+      DIMS.forEach(function (dim, i) {
+        var val = row.keys[i] || '—';
+        var isTNT = dim === 'tntm' && val !== '(none)';
+        h +=
+          '<td><strong style="color:' +
+          (isTNT ? 'var(--green)' : 'var(--navy)') +
+          '">' +
+          val +
+          '</strong></td>';
+      });
+      h += '<td class="rn">' + row.n + '</td>';
+      if (sv) h += '<td class="rn">' + row.vol.toFixed(1) + '</td>';
+      if (sy) h += '<td class="rn">' + row.voy.toLocaleString() + '</td>';
+      if (sc) h += '<td class="rn">' + (row.calls != null ? row.calls : portCalls(row.voy)).toLocaleString() + '</td>';
+      if (st) {
+        h +=
+          '<td class="rn" style="color:' +
+          (row.tnt > 0 ? 'var(--green)' : 'var(--muted)') +
+          '">' +
+          row.tnt +
+          '</td>';
+      }
+      if (sj) {
+        h +=
+          '<td class="rn" style="color:' +
+          (row.jwl > 0 ? '#D97706' : 'var(--muted)') +
+          '">' +
+          (row.jwl || '—') +
+          '</td>';
+      }
+      if (scov) h += '<td class="rn">' + tntShare + '</td>';
+      if (svt) {
+        h +=
+          '<td>' +
+          row.vts
+            .slice(0, 3)
+            .map(function (x) {
+              return '<span class="cr">' + x + '</span>';
+            })
+            .join('') +
+          '</td>';
+      }
+      if (so) {
+        h +=
+          '<td>' +
+          row.ow
+            .slice(0, 4)
+            .map(function (x) {
+              return '<span class="cr">' + x + '</span>';
+            })
+            .join('') +
+          (row.ow.length > 4
+            ? ' <span style="color:var(--muted);font-size:9px">+' + (row.ow.length - 4) + '</span>'
+            : '') +
+          '</td>';
+      }
+      if (sch) {
+        h +=
+          '<td>' +
+          row.ch
+            .slice(0, 4)
+            .map(function (x) {
+              return '<span class="cr cr-c">' + x + '</span>';
+            })
+            .join('') +
+          (row.ch.length > 4
+            ? ' <span style="color:var(--muted);font-size:9px">+' + (row.ch.length - 4) + '</span>'
+            : '') +
+          '</td>';
+      }
+      if (stu) {
+        h +=
+          '<td>' +
+          row.tg
+            .slice(0, 4)
+            .map(function (x) {
+              return '<span class="cr">' + x + '</span>';
+            })
+            .join('') +
+          (row.tg.length > 4
+            ? ' <span style="color:var(--muted);font-size:9px">+' + (row.tg.length - 4) + '</span>'
+            : '') +
+          '</td>';
+      }
+      if (sm) {
+        h +=
+          '<td>' +
+          row.tm
+            .map(function (x) {
+              return '<span class="cr cr-t">' + x + '</span>';
+            })
+            .join('') +
+          '</td>';
+      }
+      h += '</tr>';
+    });
+
+    // Footer always uses unique-corridor totals (avoids double-count when dims expand).
+    var meta = window._rptMeta || summarizeSource([]);
+    var tv = meta.vol;
+    var ty = meta.voy;
+    var tc = meta.calls;
+    var tn = meta.n;
+    var tt = meta.tnt;
+    var tj = meta.jwl;
+    var footLabel = window._rptMeta && window._rptMeta.expanded
+      ? 'TOTAL (' + rows.length + ' groups · ' + tn + ' unique corridors)'
+      : 'TOTAL (' + rows.length + ' groups)';
+
+    h += '</tbody><tfoot><tr>';
+    h += '<td colspan="' + DIMS.length + '"><strong>' + footLabel + '</strong></td>';
+    h += '<td class="rn">' + tn + '</td>';
+    if (sv) h += '<td class="rn">' + tv.toFixed(1) + '</td>';
+    if (sy) h += '<td class="rn">' + ty.toLocaleString() + '</td>';
+    if (sc) h += '<td class="rn">' + tc.toLocaleString() + '</td>';
+    if (st) h += '<td class="rn">' + tt + '</td>';
+    if (sj) h += '<td class="rn">' + tj + '</td>';
+    if (scov) h += '<td class="rn">' + (tn > 0 ? ((tt / tn) * 100).toFixed(0) + '%' : '—') + '</td>';
+    if (svt || so || sch || stu || sm) {
+      var extra = [svt, so, sch, stu, sm].filter(Boolean).length;
+      h += '<td colspan="' + extra + '"></td>';
+    }
+    h += '</tr></tfoot></table>';
+    return h;
+  };
+
+  window.rndDet = function () {
+    var RD = getReportData();
+    var sv = cv('cvol');
+    var sy = cv('cvoy');
+    var sc = cv('ccal');
+    var st = cv('ctnt');
+    var so = cv('cow');
+    var sch = cv('cch');
+    var stu = cv('ctu');
+    var h =
+      '<table class="rpt-tbl"><thead><tr>' +
+      '<th>Origin Port</th><th>Orig. Country</th>' +
+      '<th>Dest. Port</th><th>Dest. Country</th>' +
+      '<th>Commodity</th><th>Group</th><th>Vessel Type</th>' +
+      (sv ? '<th class="rn">Mt 2025</th>' : '') +
+      (sy ? '<th class="rn">Voyages</th>' : '') +
+      (sc ? '<th class="rn">Port Calls</th>' : '') +
+      (st ? '<th>TNT Status</th>' : '') +
+      (so ? '<th>Shipowners</th>' : '') +
+      (sch ? '<th>Charterers</th>' : '') +
+      (stu ? '<th>Towage — Origin</th><th>Towage — Dest</th>' : '') +
+      '</tr></thead><tbody>';
+
+    RD.forEach(function (r) {
+      var tl =
+        r.tf === '> Origin / > Dest'
+          ? '👑 ' + r.to + '+' + r.td
+          : r.tf === '> Origin'
+            ? '⚓ ' + r.to
+            : r.tf === '> Dest'
+              ? '⚓ ' + r.td
+              : '—';
+      h +=
+        '<tr>' +
+        '<td><strong>' +
+        r.o +
+        '</strong></td><td>' +
+        r.co +
+        '</td>' +
+        '<td><strong>' +
+        r.d +
+        '</strong></td><td>' +
+        r.cd +
+        '</td>' +
+        '<td style="color:var(--blue);font-weight:600">' +
+        r.c +
+        '</td>' +
+        '<td style="font-size:10px;color:var(--muted)">' +
+        r.g +
+        '</td>' +
+        '<td style="font-size:10px">' +
+        r.v +
+        '</td>' +
+        (sv ? '<td class="rn">' + r.mt.toFixed(1) + '</td>' : '') +
+        (sy ? '<td class="rn">' + r.ca.toLocaleString() + '</td>' : '') +
+        (sc ? '<td class="rn">' + portCalls(r.ca).toLocaleString() + '</td>' : '') +
+        (st
+          ? '<td style="font-size:10px;color:' +
+            (hasTnt(r.tf) ? 'var(--green)' : 'var(--muted)') +
+            '">' +
+            tl +
+            '</td>'
+          : '') +
+        (so ? '<td style="font-size:9px">' + (r.ow || []).slice(0, 3).join(', ') + '</td>' : '') +
+        (sch ? '<td style="font-size:9px">' + (r.ch || []).slice(0, 3).join(', ') + '</td>' : '') +
+        (stu
+          ? '<td style="font-size:9px">' +
+            ((r.tw || []).slice(0, 2).join(', ') || '—') +
+            '</td>' +
+            '<td style="font-size:9px">' +
+            ((r.tx || []).slice(0, 2).join(', ') || '—') +
+            '</td>'
+          : '') +
+        '</tr>';
+    });
+
+    var meta = summarizeSource(RD);
+    window._rptMeta = Object.assign(meta, { expanded: false, groups: RD.length });
+    h +=
+      '</tbody><tfoot><tr><td colspan="7"><strong>TOTAL — ' +
+      RD.length +
+      ' corridors</strong></td>' +
+      (sv ? '<td class="rn"><strong>' + meta.vol.toFixed(1) + '</strong></td>' : '') +
+      (sy ? '<td class="rn"><strong>' + meta.voy.toLocaleString() + '</strong></td>' : '') +
+      (sc ? '<td class="rn"><strong>' + meta.calls.toLocaleString() + '</strong></td>' : '') +
+      (st ? '<td></td>' : '') +
+      (so ? '<td></td>' : '') +
+      (sch ? '<td></td>' : '') +
+      (stu ? '<td></td><td></td>' : '') +
+      '</tr></tfoot></table>';
+    document.getElementById('rpt-wrap').innerHTML = h;
+    document.getElementById('rpt-cnt').textContent =
+      RD.length + ' corridors · ' + meta.vol.toFixed(0) + ' Mt';
+  };
+
+  if (typeof resetReport === 'function') {
+    var _resetReport = resetReport;
+    window.resetReport = function () {
+      _resetReport();
+      // Restore default metric columns
+      [
+        ['cvol', true],
+        ['cvoy', true],
+        ['ccal', true],
+        ['ctnt', true],
+        ['cjwl', true],
+        ['ccov', false],
+        ['cow', false],
+        ['cch', false],
+        ['ctu', false],
+        ['cmb', false],
+        ['cvt', false],
+      ].forEach(function (pair) {
+        var el = document.getElementById(pair[0]);
+        if (!el) return;
+        el.checked = pair[1];
+        var lab = el.closest('.ct');
+        if (lab) lab.classList.toggle('on', pair[1]);
+      });
+      window._rptMeta = null;
+    };
+  }
 
   // ── Fix: table sort relied on implicit global event ────────────────
   if (typeof srt === 'function') {
@@ -839,7 +1315,42 @@
   if (typeof go === 'function') {
     var _go = go;
     window.go = function () {
-      _go();
+      // Rebuild F with dash-normalized TNT presence checks (do not rely on post-filter).
+      var f = getF();
+      F = DATA.filter(function (r) {
+        if (f.q) {
+          var hay = [r.o, r.d, r.co, r.cd, r.c, r.v]
+            .concat(r.ow || [], r.ch || [], r.tw || [], r.tx || [])
+            .join(' ')
+            .toLowerCase();
+          if (hay.indexOf(f.q) === -1) return false;
+        }
+        if (f.o && r.o !== f.o) return false;
+        if (f.d && r.d !== f.d) return false;
+        if (f.co && r.co !== f.co) return false;
+        if (f.cd && r.cd !== f.cd) return false;
+        if (f.g && r.g !== f.g) return false;
+        if (f.c && r.c !== f.c) return false;
+        if (f.v && r.v !== f.v) return false;
+        if (f.m && r.mt < f.m) return false;
+        if (f.ow && !(r.ow || []).includes(f.ow)) return false;
+        if (f.ch && !(r.ch || []).includes(f.ch)) return false;
+        if (f.tg && !(r.tw || []).includes(f.tg) && !(r.tx || []).includes(f.tg)) return false;
+        if (f.tm && !(r.to || '').includes(f.tm) && !(r.td || '').includes(f.tm)) return false;
+        if (f.tp === 'both' && r.tf !== '> Origin / > Dest') return false;
+        if (f.tp === 'any' && noTnt(r.tf)) return false;
+        if (f.tp === 'none' && hasTnt(r.tf)) return false;
+        return true;
+      });
+      F.sort(function (a, b) {
+        return typeof a[SK] === 'string'
+          ? SD * a[SK].localeCompare(b[SK])
+          : SD * (a[SK] - b[SK]);
+      });
+      PG = 1;
+      updSum();
+      updPills(f);
+      render();
       markUpdating(false);
       updateFilterBadge();
       polishTableEmpty();
@@ -1055,7 +1566,7 @@
     });
   }
 
-  // ── Dashboard shell: dark sidebar layout matching the mockup ───────
+  // ── Dashboard shell: dark filter sidebar with horizontal navigation ─
   var NAV_ICONS = {
     table:
       '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>',
@@ -1135,13 +1646,8 @@
     }
 
     if (nav) {
-      nav.classList.add('sidebar-nav');
-      var afterBrand = sidebar.querySelector('.sidebar-brand');
-      if (afterBrand && afterBrand.nextSibling) {
-        sidebar.insertBefore(nav, afterBrand.nextSibling);
-      } else {
-        sidebar.insertBefore(nav, sidebar.firstChild);
-      }
+      nav.classList.remove('sidebar-nav');
+      nav.classList.add('main-nav');
 
       var views = ['table', 'analytics', 'multiport', 'report'];
       var labels = ['Corridors', 'Analytics', 'Multi-Port', 'Report Builder'];
@@ -1245,6 +1751,11 @@
     }
 
     var topbarEl = document.querySelector('.main-topbar');
+    if (nav && topbarEl) {
+      if (topbarEl.nextSibling) main.insertBefore(nav, topbarEl.nextSibling);
+      else main.appendChild(nav);
+    }
+
     if (topbarEl && !document.getElementById('tnt-mobile-filters')) {
       var mob = document.createElement('button');
       mob.type = 'button';
