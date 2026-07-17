@@ -271,10 +271,14 @@ body.tnt-shell .sec-body {
   padding: 2px 6px 10px;
 }
 
-body.tnt-shell .fl {
+body.tnt-shell .sidebar .fl {
   color: rgba(226, 232, 240, 0.42);
   font-size: 9px;
   margin-bottom: 4px;
+}
+
+body.tnt-shell #vw-report .fl {
+  color: #000;
 }
 
 body.tnt-shell .sidebar select,

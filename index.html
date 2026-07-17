@@ -46,7 +46,7 @@ body{background:var(--bg);color:var(--slate);font-size:13px;line-height:1.5;
 .sec-body{padding:8px 10px;display:none;}
 .sec-body.open{display:block;}
 .fg{margin-bottom:7px;}
-.fl{font-size:9.5px;font-weight:700;color:var(--muted);margin-bottom:3px;
+.fl{display:block;font-size:9.5px;font-weight:700;color:var(--muted);margin-bottom:3px;
   text-transform:uppercase;letter-spacing:.3px;}
 select,input[type=text],input[type=number]{width:100%;padding:5px 7px;
   border:1px solid var(--border);border-radius:4px;font-size:11px;
@@ -446,23 +446,23 @@ td{padding:6px 9px;font-size:11px;vertical-align:top;
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;">
           <div>
-            <div class="fl">Origin Country</div>
+            <label class="fl" for="rq-co">Origin Country</label>
             <select class="filter-select" id="rq-co" onchange="rfr()"><option value="">All</option></select>
           </div>
           <div>
-            <div class="fl">Destination Country</div>
+            <label class="fl" for="rq-cd">Destination Country</label>
             <select class="filter-select" id="rq-cd" onchange="rfr()"><option value="">All</option></select>
           </div>
           <div>
-            <div class="fl">Origin Port</div>
+            <label class="fl" for="rq-o">Origin Port</label>
             <select class="filter-select" id="rq-o" onchange="rfr()"><option value="">All</option></select>
           </div>
           <div>
-            <div class="fl">Destination Port</div>
+            <label class="fl" for="rq-d">Destination Port</label>
             <select class="filter-select" id="rq-d" onchange="rfr()"><option value="">All</option></select>
           </div>
           <div>
-            <div class="fl">Commodity Group</div>
+            <label class="fl" for="rq-g">Commodity Group</label>
             <select class="filter-select" id="rq-g" onchange="rfr()">
               <option value="">All Groups</option>
               <option>Energy</option><option>Minerals</option>
@@ -470,15 +470,15 @@ td{padding:6px 9px;font-size:11px;vertical-align:top;
             </select>
           </div>
           <div>
-            <div class="fl">Commodity</div>
+            <label class="fl" for="rq-c">Commodity</label>
             <select class="filter-select" id="rq-c" onchange="rfr()"><option value="">All</option></select>
           </div>
           <div>
-            <div class="fl">Vessel Type</div>
+            <label class="fl" for="rq-v">Vessel Type</label>
             <select class="filter-select" id="rq-v" onchange="rfr()"><option value="">All</option></select>
           </div>
           <div>
-            <div class="fl">TNT Presence</div>
+            <label class="fl" for="rq-tp">TNT Presence</label>
             <select class="filter-select" id="rq-tp" onchange="rfr()">
               <option value="">All corridors</option>
               <option value="both">Prompt Opportunities (both ends)</option>
@@ -487,7 +487,7 @@ td{padding:6px 9px;font-size:11px;vertical-align:top;
             </select>
           </div>
           <div>
-            <div class="fl">TNT Member</div>
+            <label class="fl" for="rq-tm">TNT Member</label>
             <select class="filter-select" id="rq-tm" onchange="rfr()">
               <option value="">All</option>
               <option value="CPT Towage">CPT Towage</option>
@@ -497,15 +497,15 @@ td{padding:6px 9px;font-size:11px;vertical-align:top;
             </select>
           </div>
           <div>
-            <div class="fl">Shipowner</div>
+            <label class="fl" for="rq-ow">Shipowner</label>
             <select class="filter-select" id="rq-ow" onchange="rfr()"><option value="">All</option></select>
           </div>
           <div>
-            <div class="fl">Charterer</div>
+            <label class="fl" for="rq-ch">Charterer</label>
             <select class="filter-select" id="rq-ch" onchange="rfr()"><option value="">All</option></select>
           </div>
           <div>
-            <div class="fl">Min Volume (Mt)</div>
+            <label class="fl" for="rq-m">Min Volume (Mt)</label>
             <input type="number" class="filter-select" id="rq-m" placeholder="0" min="0" oninput="rfr()" style="height:27px">
           </div>
         </div>
