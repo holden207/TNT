@@ -35,7 +35,6 @@ body {
   position: relative;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse 80% 60% at 20% 20%, rgba(212, 144, 10, 0.22), transparent 55%),
     radial-gradient(ellipse 70% 50% at 80% 80%, rgba(30, 78, 121, 0.45), transparent 50%),
     linear-gradient(155deg, #001238 0%, #002060 42%, #0c3a6e 100%);
   overflow: hidden;
@@ -67,26 +66,16 @@ body {
 .visual-logo {
   position: absolute;
   z-index: 1;
-  top: clamp(36px, 8vh, 72px);
-  left: clamp(36px, 6vw, 64px);
-  width: clamp(140px, 22vw, 220px);
+  top: 47%;
+  left: 46%;
+  width: clamp(220px, 30vw, 340px);
   height: auto;
   aspect-ratio: 1;
   border-radius: 50%;
   object-fit: cover;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  animation: fadeUp 0.7s ease both;
-}
-
-.visual-content {
-  position: relative;
-  z-index: 1;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 48px 56px 64px;
-  animation: fadeUp 0.7s 0.08s ease both;
+  transform: translate(-50%, -50%);
+  animation: logoFade 0.7s ease both;
 }
 
 @keyframes fadeUp {
@@ -94,30 +83,9 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-.brand-mark {
-  font-family: 'Instrument Serif', Georgia, serif;
-  font-size: clamp(4.5rem, 9vw, 7rem);
-  line-height: 0.9;
-  color: #fff;
-  letter-spacing: 0.02em;
-  text-shadow: 0 2px 40px rgba(0,0,0,0.25);
-}
-
-.brand-tag {
-  margin-top: 18px;
-  font-size: 1.05rem;
-  font-weight: 500;
-  color: rgba(255,255,255,0.92);
-  max-width: 22ch;
-  line-height: 1.35;
-}
-
-.brand-members {
-  margin-top: 12px;
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--gold-soft);
+@keyframes logoFade {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 14px)); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
 }
 
 .login-panel {
@@ -312,23 +280,7 @@ body {
   }
 
   .visual-logo {
-    top: 28px;
-    left: 28px;
-    width: 96px;
-  }
-
-  .visual-content {
-    padding: 36px 28px 32px;
-    justify-content: flex-end;
-  }
-
-  .brand-mark {
-    font-size: 3.4rem;
-  }
-
-  .brand-tag {
-    max-width: none;
-    font-size: 0.95rem;
+    width: 112px;
   }
 }
 
