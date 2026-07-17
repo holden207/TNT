@@ -16,6 +16,22 @@
     return !noTnt(tf);
   }
 
+  function hasCapability(name) {
+    var user = window.__TNT_USER__ || {};
+    if (user.permissions && typeof user.permissions[name] === 'boolean') {
+      return user.permissions[name];
+    }
+    if (name === 'browse') return true;
+    if (name === 'manageUsers') return user.role === 'admin';
+    return user.role === 'admin' || user.role === 'analyst';
+  }
+
+  function requireCapability(name, message) {
+    if (hasCapability(name)) return true;
+    toast(message || 'Your account does not have access to this feature.', 'warn');
+    return false;
+  }
+
   function toast(message, kind) {
     var host = document.getElementById('tnt-toast-host');
     if (!host) {
@@ -74,6 +90,9 @@
   // ── Fix: report view switch called missing gr(DIM) ─────────────────
   if (typeof sw === 'function') {
     window.sw = function (v) {
+      if (v === 'report' && !requireCapability('report', 'Report Builder requires analyst access.')) {
+        return;
+      }
       VIEW = v;
       ['table', 'analytics', 'multiport', 'report'].forEach(function (n) {
         var el = document.getElementById('vw-' + n);
@@ -234,6 +253,7 @@
   };
 
   window.runReport = function () {
+    if (!requireCapability('report', 'Report Builder requires analyst access.')) return;
     if (!DIMS.length) {
       alert('Select at least one Group By dimension.');
       return;
@@ -675,6 +695,7 @@
   if (typeof rptPrint === 'function') {
     var _rptPrint = rptPrint;
     window.rptPrint = function () {
+      if (!requireCapability('print', 'Report printing requires analyst access.')) return;
       var c = document.getElementById('rpt-wrap').innerHTML;
       var filtersEl = document.getElementById('pills');
       var filters = filtersEl ? filtersEl.innerText.trim() : '';
@@ -727,6 +748,7 @@
   if (typeof csvExp === 'function') {
     var _csvExp = csvExp;
     window.csvExp = function () {
+      if (!requireCapability('export', 'CSV export requires analyst access.')) return;
       _csvExp();
       toast('CSV download started for the current view.', 'ok');
     };
@@ -734,6 +756,7 @@
   if (typeof rptCSV === 'function') {
     var _rptCsv = rptCSV;
     window.rptCSV = function () {
+      if (!requireCapability('export', 'Report export requires analyst access.')) return;
       _rptCsv();
       toast('Report CSV download started.', 'ok');
     };
@@ -795,6 +818,9 @@
       '</div>' +
       '<span class="tnt-user-initials" aria-hidden="true"></span>' +
       '<img class="tnt-user-avatar" src="' + LOGO_URL + '" alt="" width="32" height="32">' +
+      (user.role === 'admin'
+        ? '<a class="tnt-logout tnt-manage-users" id="tnt-manage-users" href="/admin/users" title="Approve users and assign roles">Manage users</a>'
+        : '') +
       '<button type="button" class="tnt-logout" id="tnt-change-pw" title="Change your password">Password</button>' +
       '<button type="button" class="tnt-logout" id="tnt-logout" title="End your session">Sign out</button>';
 
@@ -1520,7 +1546,9 @@
     tab.setAttribute('tabindex', tab.classList.contains('active') ? '0' : '-1');
     if (NAV_TITLES[i]) tab.title = NAV_TITLES[i];
     tab.addEventListener('keydown', function (e) {
-      var tabs = Array.prototype.slice.call(document.querySelectorAll('.nav-tab'));
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('.nav-tab')).filter(function (item) {
+        return !item.hidden;
+      });
       var idx = tabs.indexOf(tab);
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -1657,7 +1685,18 @@
           '<span class="nav-ico" aria-hidden="true">' + (NAV_ICONS[key] || '') + '</span>' +
           '<span>' + labels[i] + '</span>';
         tab.setAttribute('data-view', key);
+        if (key === 'report' && !hasCapability('report')) {
+          tab.hidden = true;
+          tab.setAttribute('aria-hidden', 'true');
+        }
       });
+    }
+    if (!hasCapability('report')) {
+      var reportView = document.getElementById('vw-report');
+      if (reportView) {
+        reportView.hidden = true;
+        reportView.classList.remove('active');
+      }
     }
 
     if (scroll && !document.getElementById('tnt-filters-hdr')) {
@@ -1709,24 +1748,30 @@
 
     var actions = sidebar.querySelector('.sb-actions');
     if (actions) {
+      var canUseAnalysisTools = hasCapability('report');
       actions.innerHTML =
-        '<button class="btn btn-out" type="button" id="tnt-btn-csv">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>' +
-        'Export View (CSV)</button>' +
-        '<button class="btn btn-grn" type="button" id="tnt-btn-report">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>' +
-        'Report Builder</button>' +
-        '<button class="btn btn-print" type="button" id="tnt-btn-print">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>' +
-        'Print</button>';
-      document.getElementById('tnt-btn-csv').addEventListener('click', function () {
+        (canUseAnalysisTools
+          ? '<button class="btn btn-out" type="button" id="tnt-btn-csv">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>' +
+            'Export View (CSV)</button>' +
+            '<button class="btn btn-grn" type="button" id="tnt-btn-report">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>' +
+            'Report Builder</button>' +
+            '<button class="btn btn-print" type="button" id="tnt-btn-print">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>' +
+            'Print</button>'
+          : '<p class="tnt-viewer-note">Viewer access: reports, exports, and print require an analyst role.</p>');
+      var csvButton = document.getElementById('tnt-btn-csv');
+      var reportButton = document.getElementById('tnt-btn-report');
+      var printButton = document.getElementById('tnt-btn-print');
+      if (csvButton) csvButton.addEventListener('click', function () {
         if (typeof csvExp === 'function') csvExp();
       });
-      document.getElementById('tnt-btn-report').addEventListener('click', function () {
+      if (reportButton) reportButton.addEventListener('click', function () {
         if (typeof sw === 'function') sw('report');
       });
-      document.getElementById('tnt-btn-print').addEventListener('click', function () {
-        window.print();
+      if (printButton) printButton.addEventListener('click', function () {
+        if (requireCapability('print', 'Printing requires analyst access.')) window.print();
       });
     }
 

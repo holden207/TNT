@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>User access · TNT Maritime Intelligence</title>
+  <link rel="stylesheet" href="/admin/users.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">TNT Administration</p>
+      <h1>User access</h1>
+      <p class="subtitle">Approve access requests and assign application roles.</p>
+    </div>
+    <div class="top-actions">
+      <a class="button secondary" href="/">Back to dashboard</a>
+      <button class="button secondary" id="refresh" type="button">Refresh</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="role-guide" aria-label="Role permissions">
+      <div><strong>Viewer</strong><span>Browse corridors, analytics, and multi-port views.</span></div>
+      <div><strong>Analyst</strong><span>Viewer access plus reports, exports, and print.</span></div>
+      <div><strong>Administrator</strong><span>Analyst access plus user approval and role management.</span></div>
+    </section>
+
+    <div id="notice" class="notice" role="status" hidden></div>
+    <section class="users-card">
+      <div class="card-heading">
+        <div>
+          <h2>Accounts</h2>
+          <p id="summary">Loading accounts…</p>
+        </div>
+        <select id="status-filter" aria-label="Filter by status">
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="active">Active</option>
+          <option value="disabled">Disabled</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Status</th>
+              <th>Role</th>
+              <th>Last sign-in</th>
+              <th class="actions-heading">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script src="/admin/users.js"></script>
+</body>
+</html>

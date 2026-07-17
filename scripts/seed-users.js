@@ -4,38 +4,18 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-const USERS_PATH = path.join(__dirname, '..', 'data', 'users.json');
+const USERS_PATH = process.env.TNT_USERS_PATH
+  ? path.resolve(process.env.TNT_USERS_PATH)
+  : path.join(__dirname, '..', 'data', 'users.json');
 const SALT_ROUNDS = 12;
 
-/**
- * Default accounts for local / demo use.
- * Change these passwords immediately in production (edit data/users.json
- * or re-run with --force / edit this script).
- */
+/** Bootstrap administrator. The known password must be changed at first sign-in. */
 const SEED = [
   {
     username: 'admin',
     password: 'Admin@TNT2026!',
     displayName: 'System Administrator',
     role: 'admin',
-  },
-  {
-    username: 'analyst',
-    password: 'Analyst@TNT2026!',
-    displayName: 'Maritime Analyst',
-    role: 'analyst',
-  },
-  {
-    username: 'viewer',
-    password: 'Viewer@TNT2026!',
-    displayName: 'Read-Only Viewer',
-    role: 'viewer',
-  },
-  {
-    username: 'ops',
-    password: 'Ops@TNT2026!',
-    displayName: 'Operations Lead',
-    role: 'analyst',
   },
 ];
 
@@ -48,10 +28,19 @@ async function buildSeedUsers() {
       username: u.username.toLowerCase(),
       displayName: u.displayName,
       role: u.role,
+      status: 'active',
       passwordHash,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       failedAttempts: 0,
       lockedUntil: null,
+      lastLoginAt: null,
+      approvedAt: new Date().toISOString(),
+      approvedBy: 'bootstrap',
+      disabledAt: null,
+      disabledBy: null,
+      authVersion: 1,
+      mustChangePassword: true,
     });
   }
   return users;
@@ -72,8 +61,8 @@ async function ensureUsersFile({ force = false } = {}) {
       if (Array.isArray(raw.users) && raw.users.length > 0) {
         return { created: false, path: USERS_PATH, count: raw.users.length };
       }
-    } catch (_) {
-      // Corrupt file — recreate below.
+    } catch (err) {
+      throw new Error(`Existing user store is invalid; refusing to overwrite it: ${err.message}`);
     }
   }
 

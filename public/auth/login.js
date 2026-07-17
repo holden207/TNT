@@ -9,6 +9,10 @@
   const togglePw = document.getElementById('toggle-pw');
   const REMEMBER_KEY = 'tnt-username';
 
+  if (new URLSearchParams(window.location.search).get('registered') === 'pending') {
+    showError('Access request submitted. You can sign in after an administrator approves it.');
+  }
+
   function showError(msg) {
     errorEl.hidden = false;
     errorEl.textContent = msg;
@@ -85,7 +89,9 @@
         localStorage.setItem(REMEMBER_KEY, u.toLowerCase());
       } catch (_) { /* ignore */ }
 
-      window.location.href = '/?welcome=1';
+      window.location.href = data.user && data.user.mustChangePassword
+        ? '/change-password'
+        : '/?welcome=1';
     } catch (err) {
       showError('Unable to reach the server. Check that the app is running.');
       setLoading(false);

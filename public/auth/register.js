@@ -22,7 +22,7 @@
   function setLoading(on) {
     submitBtn.disabled = on;
     spinner.hidden = !on;
-    btnLabel.textContent = on ? 'Creating…' : 'Create account';
+    btnLabel.textContent = on ? 'Submitting…' : 'Submit access request';
   }
 
   function wireToggle(btnId, input) {
@@ -80,11 +80,12 @@
         return;
       }
 
-      try {
-        localStorage.setItem('tnt-username', u.toLowerCase());
-      } catch (_) { /* ignore */ }
-
-      window.location.href = '/?welcome=1';
+      form.innerHTML =
+        '<div class="panel-header">' +
+        '<h2>Request submitted</h2>' +
+        '<p>An administrator must approve your account before you can sign in.</p>' +
+        '</div>' +
+        '<a class="submit-btn" href="/login?registered=pending">Return to sign in</a>';
     } catch (err) {
       showError('Unable to reach the server. Check that the app is running.');
       setLoading(false);
