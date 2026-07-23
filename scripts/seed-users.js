@@ -1,92 +1,31 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
-const bcrypt = require('bcryptjs');
+const { ensureUsersStore, usersPath, SEED, backendName } = require('../lib/users-store');
 
-const USERS_PATH = process.env.TNT_USERS_PATH
-  ? path.resolve(process.env.TNT_USERS_PATH)
-  : path.join(__dirname, '..', 'data', 'users.json');
-const SALT_ROUNDS = 12;
-
-/** Bootstrap administrator. The known password must be changed at first sign-in. */
-const SEED = [
-  {
-    username: 'admin',
-    password: 'Admin@TNT2026!',
-    displayName: 'System Administrator',
-    role: 'admin',
-  },
-];
-
-async function buildSeedUsers() {
-  const users = [];
-  for (const u of SEED) {
-    const passwordHash = await bcrypt.hash(u.password, SALT_ROUNDS);
-    users.push({
-      id: u.username,
-      username: u.username.toLowerCase(),
-      displayName: u.displayName,
-      role: u.role,
-      status: 'active',
-      passwordHash,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      failedAttempts: 0,
-      lockedUntil: null,
-      lastLoginAt: null,
-      approvedAt: new Date().toISOString(),
-      approvedBy: 'bootstrap',
-      disabledAt: null,
-      disabledBy: null,
-      authVersion: 1,
-      mustChangePassword: true,
-    });
-  }
-  return users;
-}
-
-/**
- * Ensure data/users.json exists with at least one user.
- * Safe for Render: creates the file on first boot when gitignored data is absent.
- * Does not overwrite a valid existing store unless force=true.
- */
-async function ensureUsersFile({ force = false } = {}) {
-  const dir = path.dirname(USERS_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-  if (!force && fs.existsSync(USERS_PATH)) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(USERS_PATH, 'utf8'));
-      if (Array.isArray(raw.users) && raw.users.length > 0) {
-        return { created: false, path: USERS_PATH, count: raw.users.length };
-      }
-    } catch (err) {
-      throw new Error(`Existing user store is invalid; refusing to overwrite it: ${err.message}`);
-    }
-  }
-
-  const users = await buildSeedUsers();
-  fs.writeFileSync(USERS_PATH, JSON.stringify({ users }, null, 2), 'utf8');
-  return { created: true, path: USERS_PATH, count: users.length };
+async function ensureUsersFile(options) {
+  return ensureUsersStore(options);
 }
 
 async function main() {
   const force = process.argv.includes('--force');
-  const result = await ensureUsersFile({ force });
+  const result = await ensureUsersStore({ force });
   if (result.created) {
     for (const u of SEED) {
       console.log(`  · ${u.username} (${u.role}) — password set`);
     }
-    console.log(`\nWrote ${result.count} users → ${result.path}`);
+    console.log(`\nWrote ${result.count} users → ${result.path} (${result.backend})`);
   } else {
-    console.log(`Users file already present (${result.count} users) → ${result.path}`);
+    console.log(`Users already present (${result.count}) → ${result.path} (${result.backend})`);
     console.log('Pass --force to overwrite with fresh seed accounts.');
   }
-  console.log('Keep data/users.json private. Do not commit plaintext passwords.');
+  if (backendName() === 'file') {
+    console.log('Keep data/users.json private. Do not commit plaintext passwords.');
+  } else {
+    console.log('Users are stored in Supabase. Keep SUPABASE_SERVICE_ROLE_KEY private.');
+  }
 }
 
-module.exports = { ensureUsersFile, USERS_PATH, SEED };
+module.exports = { ensureUsersFile, USERS_PATH: usersPath(), SEED };
 
 if (require.main === module) {
   main().catch((err) => {

@@ -10,13 +10,15 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 
-const { ensureUsersFile } = require('./scripts/seed-users');
+const {
+  ensureUsersStore,
+  loadUsers,
+  saveUsers,
+  backendName,
+} = require('./lib/users-store');
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT) || 3847;
-const USERS_PATH = process.env.TNT_USERS_PATH
-  ? path.resolve(process.env.TNT_USERS_PATH)
-  : path.join(ROOT, 'data', 'users.json');
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 const MAX_FAILED = 5;
 const LOCK_MS = 15 * 60 * 1000; // 15 minutes
@@ -71,40 +73,27 @@ function assetUrl(pathname) {
 const sessions = new Map();
 let userMutationQueue = Promise.resolve();
 
-function loadUsers() {
-  if (!fs.existsSync(USERS_PATH)) {
-    throw new Error('User store is not initialized. Restart the server or run: npm run seed');
-  }
-  const raw = JSON.parse(fs.readFileSync(USERS_PATH, 'utf8'));
-  if (!Array.isArray(raw.users)) {
-    throw new Error('User store is corrupt (missing users array).');
-  }
-  return raw.users;
-}
-
-function saveUsers(users) {
-  const dir = path.dirname(USERS_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const tmp = `${USERS_PATH}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify({ users }, null, 2), 'utf8');
-  fs.renameSync(tmp, USERS_PATH);
-}
-
 function mutateUsers(mutator) {
   const run = userMutationQueue.then(async () => {
-    const users = loadUsers();
+    const users = await loadUsers();
     const result = await mutator(users);
-    saveUsers(users);
+    await saveUsers(users);
     return result;
   });
   userMutationQueue = run.catch(() => {});
   return run;
 }
 
-function findUser(username) {
-  const users = loadUsers();
+async function findUser(username) {
+  const users = await loadUsers();
   const u = users.find((x) => x.username === String(username).toLowerCase().trim());
   return { users, user: u || null };
+}
+
+function wrapAsync(handler) {
+  return (req, res, next) => {
+    Promise.resolve(handler(req, res, next)).catch(next);
+  };
 }
 
 function normalizeUsername(raw) {
@@ -193,7 +182,7 @@ function createSession(user) {
   return id;
 }
 
-function getSession(req) {
+async function getSession(req) {
   const id = req.cookies?.[COOKIE_NAME];
   if (!id) return null;
   const s = sessions.get(id);
@@ -204,7 +193,8 @@ function getSession(req) {
   }
   let user;
   try {
-    user = loadUsers().find((item) => item.id === s.userId);
+    const users = await loadUsers();
+    user = users.find((item) => item.id === s.userId);
   } catch (_) {
     sessions.delete(id);
     return null;
@@ -231,8 +221,8 @@ function getSession(req) {
   };
 }
 
-function requireAuth(req, res, next) {
-  const session = getSession(req);
+const requireAuth = wrapAsync(async (req, res, next) => {
+  const session = await getSession(req);
   if (!session) {
     if (req.path.startsWith('/api/')) {
       return res.status(401).json({ ok: false, error: 'Authentication required' });
@@ -241,16 +231,22 @@ function requireAuth(req, res, next) {
   }
   req.session = session;
   next();
-}
+});
 
-function requireAdmin(req, res, next) {
-  return requireAuth(req, res, () => {
-    if (req.session.role !== 'admin') {
-      return res.status(403).json({ ok: false, error: 'Administrator access required.' });
+const requireAdmin = wrapAsync(async (req, res, next) => {
+  const session = await getSession(req);
+  if (!session) {
+    if (req.path.startsWith('/api/')) {
+      return res.status(401).json({ ok: false, error: 'Authentication required' });
     }
-    next();
-  });
-}
+    return res.redirect('/login');
+  }
+  if (session.role !== 'admin') {
+    return res.status(403).json({ ok: false, error: 'Administrator access required.' });
+  }
+  req.session = session;
+  next();
+});
 
 function requireSameOriginJson(req, res, next) {
   if (!req.is('application/json')) {
@@ -383,17 +379,17 @@ app.get('/api/version', (_req, res) => {
   });
 });
 
-app.get('/login', (req, res) => {
-  const session = getSession(req);
+app.get('/login', wrapAsync(async (req, res) => {
+  const session = await getSession(req);
   if (session) return res.redirect(session.mustChangePassword ? '/change-password' : '/');
   res.sendFile(path.join(ROOT, 'public', 'auth', 'login.html'));
-});
+}));
 
-app.get('/register', (req, res) => {
-  const session = getSession(req);
+app.get('/register', wrapAsync(async (req, res) => {
+  const session = await getSession(req);
   if (session) return res.redirect(session.mustChangePassword ? '/change-password' : '/');
   res.sendFile(path.join(ROOT, 'public', 'auth', 'register.html'));
-});
+}));
 
 app.get('/change-password', requireAuth, (_req, res) => {
   res.sendFile(path.join(ROOT, 'public', 'auth', 'change-password.html'));
@@ -410,8 +406,8 @@ app.get('/admin/users.js', (_req, res) => {
   res.sendFile(path.join(ROOT, 'public', 'admin', 'users.js'));
 });
 
-app.get('/api/session', (req, res) => {
-  const session = getSession(req);
+app.get('/api/session', wrapAsync(async (req, res) => {
+  const session = await getSession(req);
   if (!session) return res.status(401).json({ ok: false, authenticated: false });
   res.json({
     ok: true,
@@ -424,7 +420,7 @@ app.get('/api/session', (req, res) => {
       mustChangePassword: session.mustChangePassword,
     },
   });
-});
+}));
 
 app.post('/api/login', loginLimiter, async (req, res) => {
   try {
@@ -438,7 +434,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Invalid credentials.' });
     }
 
-    const { user } = findUser(username);
+    const { user } = await findUser(username);
     // Valid bcrypt hash used only when the username is unknown (timing parity)
     const dummyHash = '$2a$12$/j5FIC65lNLKtab9Q2/5yOBcure3S9t/NS9zRIDMBi6sJDPR/V2ZK';
 
@@ -622,7 +618,7 @@ app.post('/api/change-password', requireSameOriginJson, requireAuth, async (req,
       return res.status(400).json({ ok: false, error: 'New password must be different from the current one.' });
     }
 
-    const { user } = findUser(req.session.username);
+    const { user } = await findUser(req.session.username);
     if (!user) {
       return res.status(401).json({ ok: false, error: 'Account not found.' });
     }
@@ -667,18 +663,18 @@ app.post('/api/change-password', requireSameOriginJson, requireAuth, async (req,
   }
 });
 
-app.get('/api/admin/users', requireAdmin, (req, res) => {
+app.get('/api/admin/users', requireAdmin, wrapAsync(async (req, res) => {
   if (req.session.mustChangePassword) {
     return res.status(403).json({ ok: false, code: 'PASSWORD_CHANGE_REQUIRED', error: 'Change your password first.' });
   }
-  const users = loadUsers()
+  const users = (await loadUsers())
     .map(publicUser)
     .sort((a, b) => {
       const order = { pending: 0, active: 1, disabled: 2 };
       return order[a.status] - order[b.status] || a.username.localeCompare(b.username);
     });
   res.json({ ok: true, users });
-});
+}));
 
 app.patch('/api/admin/users/:id', requireSameOriginJson, requireAdmin, async (req, res) => {
   try {
@@ -810,6 +806,15 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((err, _req, res, next) => {
+  if (res.headersSent) return next(err);
+  console.error('Unhandled error:', err);
+  if (_req.path?.startsWith('/api/')) {
+    return res.status(500).json({ ok: false, error: 'Server error.' });
+  }
+  res.status(500).send('Server error');
+});
+
 app.use((req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ ok: false, error: 'Not found' });
@@ -819,10 +824,12 @@ app.use((req, res) => {
 
 async function start(options = {}) {
   const listenPort = options.port === undefined ? PORT : options.port;
-  const store = await ensureUsersFile();
+  const store = await ensureUsersStore();
   await migrateExistingUsers();
   if (store.created && !options.quiet) {
-    console.log(`  Initialized bootstrap administrator → ${store.path}`);
+    console.log(`  Initialized bootstrap administrator → ${store.path} (${store.backend})`);
+  } else if (!options.quiet) {
+    console.log(`  User store: ${backendName()} (${store.count} users)`);
   }
 
   return new Promise((resolve, reject) => {
